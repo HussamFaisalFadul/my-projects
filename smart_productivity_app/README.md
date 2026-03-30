@@ -1,3 +1,9 @@
+![Flutter](https://img.shields.io/badge/Flutter-3.24-02569B?logo=flutter&style=for-the-badge&logoColor=white)
+![Firebase](https://img.shields.io/badge/Firebase-Firestore-FFCA28?logo=firebase&style=for-the-badge&logoColor=black)
+![Dart](https://img.shields.io/badge/Dart-3.0-0175C2?logo=dart&style=for-the-badge&logoColor=white)
+![Riverpod](https://img.shields.io/badge/Riverpod-2.0-1E88E5?style=for-the-badge)
+![Platform](https://img.shields.io/badge/Android-3DDC84?logo=android&style=for-the-badge&logoColor=white)
+![License](https://img.shields.io/badge/License-All_Rights_Reserved-red?style=for-the-badge)
 
 # Smart Productivity App 📋
 
