@@ -48,8 +48,9 @@ export interface Notification {
   read: boolean;
 }
 
-const BACKEND_URL = 'https://store-dashboard-backend.onrender.com';export const socket: Socket = io(BACKEND_URL, {
-  autoConnect: true,
+const BACKEND_URL = 'https://store-dashboard-backend.onrender.com';
+
+export const socket: Socket = io(BACKEND_URL, {  autoConnect: true,
   reconnection: true,
 });
 
