@@ -25,7 +25,10 @@ app.use(express.json());
 
 app.get('/api/products', async (_, res) => {
   try { res.json(await getProducts()); }
-  catch (err) { res.status(500).json({ error: 'خطأ في جلب المنتجات' }); }
+  catch (err: any) { 
+    console.error('❌ خطأ في جلب المنتجات:', err.message, err.stack);
+    res.status(500).json({ error: err.message }); 
+  }
 });
 
 app.get('/api/orders', async (_, res) => {
