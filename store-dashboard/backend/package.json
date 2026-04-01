@@ -28,14 +28,3 @@
     "typescript": "^5.3.2"
   }
 }
-```
-
-اضغط **Commit changes** ✅
-
----
-
-## الملف الثاني — الاتصال بقاعدة البيانات
-
-أنشئ ملفاً جديداً على جيت هاب في هذا المسار:
-```
-store-dashboard/backend/src/db/connection.ts
