@@ -3,6 +3,8 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import passport from 'passport';
+import authRouter from './auth/routes';
 import {
   getProducts, addProduct, updateProduct, deleteProduct,
   getOrders, addOrder, updateOrderStatus,
