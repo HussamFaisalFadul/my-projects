@@ -22,7 +22,8 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
 
 app.use(cors({ origin: '*' }));
 app.use(express.json());
-
+app.use(passport.initialize());
+app.use('/auth', authRouter);
 // ===== واجهة برمجة التطبيقات =====
 
 app.get('/api/products', async (_, res) => {
