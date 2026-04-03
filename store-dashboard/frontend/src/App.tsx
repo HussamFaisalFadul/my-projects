@@ -1,3 +1,4 @@
+import Login from './pages/Login';
 import { useState, useEffect, useCallback } from 'react';
 import { socket, api, Product, Order, StoreStats, Notification } from './api';
 import Dashboard from './pages/Dashboard';
@@ -17,6 +18,31 @@ export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState<string | null>(
+    localStorage.getItem('store_token')
+  );
+  const [currentUser, setCurrentUser] = useState<any>(
+    JSON.parse(localStorage.getItem('store_user') || 'null')
+  );
+
+  const handleLogin = (newToken: string, user: any) => {
+    localStorage.setItem('store_token', newToken);
+    localStorage.setItem('store_user', JSON.stringify(user));
+    setToken(newToken);
+    setCurrentUser(user);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('store_token');
+    localStorage.removeItem('store_user');
+    setToken(null);
+    setCurrentUser(null);
+  };
+
+  // التحقق من المصادقة قبل تحميل البيانات
+  if (!token || !currentUser) {
+    return <Login onLogin={handleLogin} />;
+  }
 
   // تحميل البيانات الأولية
   useEffect(() => {
