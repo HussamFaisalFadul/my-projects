@@ -19,7 +19,7 @@ export default function App() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [loading, setLoading] = useState(true);
   const [creatingStore, setCreatingStore] = useState(false);
-  const [storeName, setStoreName] = useState('');
+  const [newStoreName, setNewStoreName] = useState('');
   const [storeError, setStoreError] = useState('');
 
   const [token, setToken] = useState<string | null>(localStorage.getItem('store_token'));
@@ -29,7 +29,7 @@ export default function App() {
   const [currentStoreId, setCurrentStoreId] = useState<string | null>(
     localStorage.getItem('store_id')
   );
-  const [storeName2, setStoreName2] = useState<string | null>(
+  const [storeName, setStoreName] = useState<string | null>(
     localStorage.getItem('store_name')
   );
 
@@ -48,12 +48,82 @@ export default function App() {
     setToken(null);
     setCurrentUser(null);
     setCurrentStoreId(null);
-    setStoreName2(null);
+    setStoreName(null);
     setProducts([]);
     setOrders([]);
     setStats(null);
     setNotifications([]);
+    setLoading(true);
   };
+
+  const handleCreateStore = async () => {
+    if (!newStoreName.trim()) { setStoreError('اكتب اسم المتجر'); return; }
+    setCreatingStore(true);
+    setStoreError('');
+    try {
+      const store = await api.createStore({ name: newStoreName.trim() });
+      if (store.id) {
+        localStorage.setItem('store_id', store.id);
+        localStorage.setItem('store_name', store.name);
+        setCurrentStoreId(store.id);
+        setStoreName(store.name);
+      } else {
+        setStoreError(store.error || 'حدث خطأ');
+      }
+    } catch {
+      setStoreError('تعذر الاتصال بالخادم');
+    }
+    setCreatingStore(false);
+  };
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+  const markAllRead = useCallback(() => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  }, []);
+
+  // ===== تحميل البيانات — كل الـ hooks قبل أي return =====
+  useEffect(() => {
+    if (!token || !currentStoreId) return;
+    setLoading(true);
+    Promise.all([
+      api.getProducts(),
+      api.getOrders(),
+      api.getStats(),
+      api.getNotifications(),
+    ]).then(([p, o, s, n]) => {
+      setProducts(Array.isArray(p) ? p : []);
+      setOrders(Array.isArray(o) ? o : []);
+      setStats(s);
+      setNotifications(Array.isArray(n) ? n : []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [token, currentStoreId]);
+
+  // ===== الويب سوكيت =====
+  useEffect(() => {
+    if (!currentStoreId) return;
+    socket.emit('join_store', currentStoreId);
+
+    socket.on('connect', () => setIsConnected(true));
+    socket.on('disconnect', () => setIsConnected(false));
+    socket.on('product_added', (product) => setProducts(prev => [...prev, product]));
+    socket.on('product_updated', (product) => setProducts(prev => prev.map(p => p.id === product.id ? product : p)));
+    socket.on('product_deleted', (id) => setProducts(prev => prev.filter(p => p.id !== id)));
+    socket.on('order_added', (order) => setOrders(prev => [order, ...prev]));
+    socket.on('order_updated', (order) => setOrders(prev => prev.map(o => o.id === order.id ? order : o)));
+    socket.on('stats_updated', (s) => setStats(s));
+    socket.on('notification', (n) => setNotifications(prev => [n, ...prev].slice(0, 50)));
+
+    return () => {
+      socket.emit('leave_store', currentStoreId);
+      socket.off('connect'); socket.off('disconnect');
+      socket.off('product_added'); socket.off('product_updated'); socket.off('product_deleted');
+      socket.off('order_added'); socket.off('order_updated');
+      socket.off('stats_updated'); socket.off('notification');
+    };
+  }, [currentStoreId]);
+
+  // ===== بعد كل الـ hooks — الـ returns المشروطة =====
 
   if (window.location.pathname === '/auth/callback') {
     return <AuthCallback onLogin={handleLogin} />;
@@ -63,28 +133,7 @@ export default function App() {
     return <Login onLogin={handleLogin} />;
   }
 
-  // ===== لو ما عنده متجر — صفحة إنشاء متجر =====
   if (!currentStoreId) {
-    const handleCreateStore = async () => {
-      if (!storeName.trim()) { setStoreError('اكتب اسم المتجر'); return; }
-      setCreatingStore(true);
-      setStoreError('');
-      try {
-        const store = await api.createStore({ name: storeName.trim() });
-        if (store.id) {
-          localStorage.setItem('store_id', store.id);
-          localStorage.setItem('store_name', store.name);
-          setCurrentStoreId(store.id);
-          setStoreName2(store.name);
-        } else {
-          setStoreError(store.error || 'حدث خطأ');
-        }
-      } catch {
-        setStoreError('تعذر الاتصال بالخادم');
-      }
-      setCreatingStore(false);
-    };
-
     return (
       <div className="app" dir="rtl">
         <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '1rem 2rem' }}>
@@ -97,8 +146,8 @@ export default function App() {
           <h2 style={{ marginBottom: 8 }}>أنشئ متجرك</h2>
           <p style={{ color: '#888', marginBottom: 24 }}>مرحباً {currentUser.name}! ابدأ بإنشاء متجرك الخاص.</p>
           <input
-            value={storeName}
-            onChange={e => setStoreName(e.target.value)}
+            value={newStoreName}
+            onChange={e => setNewStoreName(e.target.value)}
             placeholder="اسم المتجر"
             style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '1px solid #ddd', fontSize: 16, marginBottom: 12, boxSizing: 'border-box', textAlign: 'right' }}
             onKeyDown={e => e.key === 'Enter' && handleCreateStore()}
@@ -116,51 +165,6 @@ export default function App() {
     );
   }
 
-  // ===== تحميل البيانات =====
-  useEffect(() => {
-    Promise.all([
-      api.getProducts(),
-      api.getOrders(),
-      api.getStats(),
-      api.getNotifications(),
-    ]).then(([p, o, s, n]) => {
-      setProducts(Array.isArray(p) ? p : []);
-      setOrders(Array.isArray(o) ? o : []);
-      setStats(s);
-      setNotifications(Array.isArray(n) ? n : []);
-      setLoading(false);
-    });
-  }, [currentStoreId]);
-
-  // ===== الويب سوكيت =====
-  useEffect(() => {
-    if (currentStoreId) {
-      socket.emit('join_store', currentStoreId);
-    }
-
-    socket.on('connect', () => setIsConnected(true));
-    socket.on('disconnect', () => setIsConnected(false));
-    socket.on('product_added', (product) => setProducts(prev => [...prev, product]));
-    socket.on('product_updated', (product) => setProducts(prev => prev.map(p => p.id === product.id ? product : p)));
-    socket.on('product_deleted', (id) => setProducts(prev => prev.filter(p => p.id !== id)));
-    socket.on('order_added', (order) => setOrders(prev => [order, ...prev]));
-    socket.on('order_updated', (order) => setOrders(prev => prev.map(o => o.id === order.id ? order : o)));
-    socket.on('stats_updated', (s) => setStats(s));
-    socket.on('notification', (n) => setNotifications(prev => [n, ...prev].slice(0, 50)));
-
-    return () => {
-      socket.off('connect'); socket.off('disconnect');
-      socket.off('product_added'); socket.off('product_updated'); socket.off('product_deleted');
-      socket.off('order_added'); socket.off('order_updated');
-      socket.off('stats_updated'); socket.off('notification');
-    };
-  }, [currentStoreId]);
-
-  const unreadCount = notifications.filter(n => !n.read).length;
-  const markAllRead = useCallback(() => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  }, []);
-
   if (loading) {
     return (
       <div className="loading-screen">
@@ -174,7 +178,7 @@ export default function App() {
     <div className="app" dir="rtl">
       <header className="header">
         <div className="header-right">
-          <div className="logo">🏪 {storeName2 || 'متجري'}</div>
+          <div className="logo">🏪 {storeName || 'متجري'}</div>
           <nav className="nav">
             <button className={page === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('dashboard')}>الرئيسية</button>
             <button className={page === 'products' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('products')}>المنتجات</button>
@@ -209,7 +213,6 @@ export default function App() {
             )}
           </div>
 
-          {/* المستخدم + تسجيل خروج */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {currentUser.avatarUrl && (
               <img src={currentUser.avatarUrl} alt="" style={{ width: 32, height: 32, borderRadius: '50%' }} />
