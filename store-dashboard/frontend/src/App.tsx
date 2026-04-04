@@ -46,27 +46,36 @@ export default function App() {
   useEffect(() => {
     const savedToken = localStorage.getItem('store_token');
     const savedStoreId = localStorage.getItem('store_id');
+    const pendingJoinToken = localStorage.getItem('pending_join_token');
 
-    // لو عنده join_token معلق
-    const joinToken = localStorage.getItem('join_token');
-    if (savedToken && joinToken) {
-      fetch(`${BACKEND}/stores/join/${joinToken}`, {
+    // لو عنده دعوة معلقة بعد تسجيل الدخول
+    if (savedToken && pendingJoinToken) {
+      fetch(`${BACKEND}/stores/join/${pendingJoinToken}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${savedToken}` },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${savedToken}`,
+        },
       })
         .then(r => r.json())
         .then(data => {
-          if (data.storeId) {
+          if (data.success && data.storeId) {
             localStorage.setItem('store_id', data.storeId);
-            localStorage.removeItem('join_token');
+            localStorage.setItem('store_name', data.storeName || '');
+            localStorage.removeItem('pending_join_token');
             setCurrentStoreId(data.storeId);
+            setStoreName(data.storeName);
+          } else {
+            // فشل القبول — امسح التوكن المعلق وكمّل
+            localStorage.removeItem('pending_join_token');
           }
         })
-        .catch(() => {})
+        .catch(() => { localStorage.removeItem('pending_join_token'); })
         .finally(() => setInitializing(false));
       return;
     }
 
+    // لو عنده توكن بدون store_id اجلب متاجره
     if (savedToken && !savedStoreId) {
       fetch(`${BACKEND}/stores`, {
         headers: { 'Authorization': `Bearer ${savedToken}` }
@@ -187,6 +196,7 @@ export default function App() {
     return <Login onLogin={handleLogin} />;
   }
 
+  // ===== ما عنده متجر — خيار إنشاء أو الانتظار =====
   if (!currentStoreId) {
     return (
       <div className="app" dir="rtl">
@@ -196,8 +206,8 @@ export default function App() {
             تسجيل خروج
           </button>
         </div>
-        <div style={{ maxWidth: 400, margin: '80px auto', padding: '2rem', background: 'white', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,0.08)', textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🏪</div>
+        <div style={{ maxWidth: 440, margin: '60px auto', padding: '2rem', background: 'white', borderRadius: 20, boxShadow: '0 4px 24px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+          <div style={{ fontSize: 52, marginBottom: 16 }}>🏪</div>
           <h2 style={{ marginBottom: 8 }}>أنشئ متجرك</h2>
           <p style={{ color: '#888', marginBottom: 24 }}>ابدأ بإنشاء متجرك الخاص مجاناً.</p>
           <input
@@ -215,6 +225,15 @@ export default function App() {
           >
             {creatingStore ? 'جاري الإنشاء...' : 'إنشاء المتجر'}
           </button>
+
+          {/* لو عنده دعوة معلقة */}
+          {localStorage.getItem('pending_join_token') && (
+            <div style={{ marginTop: 20, padding: 16, background: '#fef3c7', borderRadius: 10 }}>
+              <p style={{ color: '#92400e', fontSize: 14, marginBottom: 8 }}>
+                ⏳ عندك دعوة معلقة — سجّل دخول بالإيميل المدعو لقبولها
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
