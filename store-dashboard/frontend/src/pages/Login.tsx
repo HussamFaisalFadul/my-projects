@@ -6,13 +6,30 @@ interface Props {
 
 const BACKEND = 'https://store-dashboard-backend.onrender.com';
 
+async function fetchAndSaveStore(token: string) {
+  try {
+    const res = await fetch(`${BACKEND}/stores`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      }
+    });
+    const stores = await res.json();
+    if (Array.isArray(stores) && stores.length > 0) {
+      localStorage.setItem('store_id', stores[0].id);
+      localStorage.setItem('store_name', stores[0].name);
+    }
+  } catch {
+    // لو فشل نكمل بدون store_id
+  }
+}
+
 export default function Login({ onLogin }: Props) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // استقبال توكن جوجل من الرابط
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
@@ -20,8 +37,12 @@ export default function Login({ onLogin }: Props) {
     const email = params.get('email');
     const role = params.get('role');
     if (token && name) {
-      onLogin(token, { name, email, role });
-      window.history.replaceState({}, '', '/');
+      localStorage.setItem('store_token', token);
+      localStorage.setItem('store_user', JSON.stringify({ name, email, role }));
+      fetchAndSaveStore(token).then(() => {
+        onLogin(token, { name, email, role });
+        window.history.replaceState({}, '', '/');
+      });
     }
   }, []);
 
@@ -44,6 +65,12 @@ export default function Login({ onLogin }: Props) {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
+
+      localStorage.setItem('store_token', data.token);
+      localStorage.setItem('store_user', JSON.stringify(data.user));
+
+      await fetchAndSaveStore(data.token);
+
       onLogin(data.token, data.user);
     } catch {
       setError('خطأ في الاتصال بالخادم');
