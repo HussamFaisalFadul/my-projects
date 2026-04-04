@@ -1,0 +1,136 @@
+import { Router, Request, Response } from 'express';
+import { authMiddleware } from '../auth/auth';
+import {
+  createStore, getStoreById, getUserStores, updateStore,
+  getStoreMembers, getMemberRole, removeMember, updateMemberRole,
+  createInvitation, getInvitationByToken, acceptInvitation, getStoreInvitations
+} from './queries';
+
+const router = Router();
+
+// كل المسارات تحتاج تسجيل دخول
+router.use(authMiddleware);
+
+// ميدلوير التحقق من عضوية المتجر
+async function storeMiddleware(req: any, res: Response, next: any) {
+  const storeId = req.params.storeId || req.body.storeId;
+  if (!storeId) return res.status(400).json({ error: 'معرف المتجر مطلوب' });
+
+  const role = await getMemberRole(storeId, req.user.id);
+  if (!role) return res.status(403).json({ error: 'ليس لديك صلاحية للوصول لهذا المتجر' });
+
+  req.storeId = storeId;
+  req.memberRole = role;
+  next();
+}
+
+// ميدلوير التحقق من صلاحية المالك أو المدير
+function ownerOrAdmin(req: any, res: Response, next: any) {
+  if (!['مالك', 'مدير'].includes(req.memberRole)) {
+    return res.status(403).json({ error: 'هذه العملية تتطلب صلاحية مالك أو مدير' });
+  }
+  next();
+}
+
+// ===== المتاجر =====
+
+// جلب متاجر المستخدم
+router.get('/', async (req: any, res: Response) => {
+  try {
+    const stores = await getUserStores(req.user.id);
+    res.json(stores);
+  } catch { res.status(500).json({ error: 'خطأ في جلب المتاجر' }); }
+});
+
+// إنشاء متجر جديد
+router.post('/', async (req: any, res: Response) => {
+  try {
+    const { name, description } = req.body;
+    if (!name) return res.status(400).json({ error: 'اسم المتجر مطلوب' });
+    const store = await createStore(name, req.user.id, description);
+    res.status(201).json(store);
+  } catch { res.status(500).json({ error: 'خطأ في إنشاء المتجر' }); }
+});
+
+// جلب تفاصيل متجر
+router.get('/:storeId', storeMiddleware, async (req: any, res: Response) => {
+  try {
+    const store = await getStoreById(req.storeId);
+    res.json({ ...store, memberRole: req.memberRole });
+  } catch { res.status(500).json({ error: 'خطأ في جلب المتجر' }); }
+});
+
+// تحديث المتجر
+router.put('/:storeId', storeMiddleware, ownerOrAdmin, async (req: any, res: Response) => {
+  try {
+    const store = await updateStore(req.storeId, req.body);
+    res.json(store);
+  } catch { res.status(500).json({ error: 'خطأ في تحديث المتجر' }); }
+});
+
+// ===== الأعضاء =====
+
+// جلب أعضاء المتجر
+router.get('/:storeId/members', storeMiddleware, async (req: any, res: Response) => {
+  try {
+    const members = await getStoreMembers(req.storeId);
+    res.json(members);
+  } catch { res.status(500).json({ error: 'خطأ في جلب الأعضاء' }); }
+});
+
+// تغيير دور عضو
+router.put('/:storeId/members/:userId/role', storeMiddleware, ownerOrAdmin, async (req: any, res: Response) => {
+  try {
+    const { role } = req.body;
+    const success = await updateMemberRole(req.storeId, req.params.userId, role);
+    if (!success) return res.status(400).json({ error: 'لا يمكن تغيير دور المالك' });
+    res.json({ success: true });
+  } catch { res.status(500).json({ error: 'خطأ في تغيير الدور' }); }
+});
+
+// إزالة عضو
+router.delete('/:storeId/members/:userId', storeMiddleware, ownerOrAdmin, async (req: any, res: Response) => {
+  try {
+    if (req.params.userId === req.user.id) {
+      return res.status(400).json({ error: 'لا يمكنك إزالة نفسك' });
+    }
+    const success = await removeMember(req.storeId, req.params.userId);
+    if (!success) return res.status(400).json({ error: 'لا يمكن إزالة المالك' });
+    res.json({ success: true });
+  } catch { res.status(500).json({ error: 'خطأ في إزالة العضو' }); }
+});
+
+// ===== الدعوات =====
+
+// إرسال دعوة
+router.post('/:storeId/invitations', storeMiddleware, ownerOrAdmin, async (req: any, res: Response) => {
+  try {
+    const { email, role } = req.body;
+    if (!email) return res.status(400).json({ error: 'الإيميل مطلوب' });
+    const invitation = await createInvitation(req.storeId, email, role || 'موظف', req.user.id);
+    res.status(201).json(invitation);
+  } catch { res.status(500).json({ error: 'خطأ في إرسال الدعوة' }); }
+});
+
+// جلب دعوات المتجر
+router.get('/:storeId/invitations', storeMiddleware, ownerOrAdmin, async (req: any, res: Response) => {
+  try {
+    const invitations = await getStoreInvitations(req.storeId);
+    res.json(invitations);
+  } catch { res.status(500).json({ error: 'خطأ في جلب الدعوات' }); }
+});
+
+// قبول دعوة بالتوكن
+router.post('/join/:token', async (req: any, res: Response) => {
+  try {
+    const invitation = await getInvitationByToken(req.params.token);
+    if (!invitation) {
+      return res.status(404).json({ error: 'الدعوة غير موجودة أو منتهية الصلاحية' });
+    }
+    const result = await acceptInvitation(req.params.token, req.user.id);
+    if (!result) return res.status(400).json({ error: 'فشل قبول الدعوة' });
+    res.json({ success: true, storeId: result.storeId, role: result.role });
+  } catch { res.status(500).json({ error: 'خطأ في قبول الدعوة' }); }
+});
+
+export default router;
