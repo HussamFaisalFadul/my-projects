@@ -127,7 +127,8 @@ export default function Login({ onLogin }: Props) {
 
         <div className="login-divider"><span>أو</span></div>
 
-        <a href={`${BACKEND}/auth/google`} className="google-btn">
+        <a href={`${BACKEND}/auth/google?prompt=select_account`} className="google-btn">
+
           <span className="google-icon">G</span>
           تسجيل الدخول بحساب جوجل
         </a>
