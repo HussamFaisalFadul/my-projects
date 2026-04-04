@@ -54,7 +54,6 @@ export interface Notification {
 
 const BACKEND_URL = 'https://store-dashboard-backend.onrender.com';
 
-// ===== هيلبر يجلب التوكن و storeId تلقائياً =====
 function authHeaders(): HeadersInit {
   const token = localStorage.getItem('store_token');
   const storeId = localStorage.getItem('store_id');
@@ -122,7 +121,7 @@ export const api = {
 
   // ===== المتاجر =====
   getMyStores: () =>
-    fetch(`${BACKEND_URL}/stores/my`, { headers: authHeaders() }).then(r => r.json()),
+    fetch(`${BACKEND_URL}/stores`, { headers: authHeaders() }).then(r => r.json()),
 
   createStore: (data: { name: string; description?: string }) =>
     fetch(`${BACKEND_URL}/stores`, {
