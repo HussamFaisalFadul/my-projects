@@ -18,7 +18,7 @@ export default function AuthCallback({ onLogin }: Props) {
       onLogin(token, { name, email, role });
 
       // جلب متجر المستخدم بعد تسجيل الدخول
-      fetch(`${BACKEND_URL}/stores/my`, {
+      fetch(`${BACKEND_URL}/stores`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
