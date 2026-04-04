@@ -1,4 +1,6 @@
 import Login from './pages/Login';
+import Settings from './pages/Settings';
+import JoinPage from './pages/JoinPage';
 import { useState, useEffect, useCallback } from 'react';
 import { socket, api, Product, Order, StoreStats, Notification } from './api';
 import Dashboard from './pages/Dashboard';
@@ -8,7 +10,7 @@ import './App.css';
 
 const BACKEND = 'https://store-dashboard-backend.onrender.com';
 
-type Page = 'dashboard' | 'products' | 'orders';
+type Page = 'dashboard' | 'products' | 'orders' | 'settings';
 
 export default function App() {
   const [page, setPage] = useState<Page>('dashboard');
@@ -35,10 +37,35 @@ export default function App() {
     localStorage.getItem('store_name')
   );
 
-  // ===== عند أول تحميل — لو عنده توكن بدون store_id اجلبه =====
+  // معالجة صفحة الانضمام
+  if (window.location.pathname.startsWith('/join/')) {
+    return <JoinPage />;
+  }
+
+  // ===== عند أول تحميل =====
   useEffect(() => {
     const savedToken = localStorage.getItem('store_token');
     const savedStoreId = localStorage.getItem('store_id');
+
+    // لو عنده join_token معلق
+    const joinToken = localStorage.getItem('join_token');
+    if (savedToken && joinToken) {
+      fetch(`${BACKEND}/stores/join/${joinToken}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${savedToken}` },
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.storeId) {
+            localStorage.setItem('store_id', data.storeId);
+            localStorage.removeItem('join_token');
+            setCurrentStoreId(data.storeId);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setInitializing(false));
+      return;
+    }
 
     if (savedToken && !savedStoreId) {
       fetch(`${BACKEND}/stores`, {
@@ -147,7 +174,6 @@ export default function App() {
     };
   }, [currentStoreId]);
 
-  // ===== شاشة تهيئة أولية =====
   if (initializing) {
     return (
       <div className="loading-screen">
@@ -212,6 +238,7 @@ export default function App() {
             <button className={page === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('dashboard')}>الرئيسية</button>
             <button className={page === 'products' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('products')}>المنتجات</button>
             <button className={page === 'orders' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('orders')}>الطلبات</button>
+            <button className={page === 'settings' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('settings')}>⚙️ الإعدادات</button>
           </nav>
         </div>
 
@@ -261,6 +288,7 @@ export default function App() {
         {page === 'dashboard' && <Dashboard stats={stats} notifications={notifications} orders={orders} products={products} />}
         {page === 'products' && <Products products={products} />}
         {page === 'orders' && <Orders orders={orders} products={products} />}
+        {page === 'settings' && <Settings storeName={storeName} onStoreNameChange={(name) => { setStoreName(name); }} />}
       </main>
     </div>
   );
