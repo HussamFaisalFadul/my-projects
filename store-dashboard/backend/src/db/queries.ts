@@ -13,9 +13,9 @@ export async function getProducts(storeId: string): Promise<Product[]> {
 
 export async function addProduct(data: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> {
   const result = await pool.query(
-    `INSERT INTO products (name, price, quantity, category, min_quantity, image_url)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [data.name, data.price, data.quantity, data.category, data.minQuantity, data.imageUrl || null]
+    `INSERT INTO products (store_id, name, price, quantity, category, min_quantity, image_url)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [data.storeId, data.name, data.price, data.quantity, data.category, data.minQuantity, data.imageUrl || null]
   );
   return mapProduct(result.rows[0]);
 }
@@ -79,9 +79,9 @@ export async function addOrder(data: Omit<Order, 'id' | 'createdAt' | 'updatedAt
     await client.query('BEGIN');
 
     const orderResult = await client.query(
-      `INSERT INTO orders (customer_name, customer_phone, source, total_price, status, notes)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [data.customerName, data.customerPhone, data.source, data.totalPrice, data.status, data.notes || null]
+      `INSERT INTO orders (store_id, customer_name, customer_phone, source, total_price, status, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [data.storeId, data.customerName, data.customerPhone, data.source, data.totalPrice, data.status, data.notes || null]
     );
     const order = orderResult.rows[0];
 
@@ -163,22 +163,24 @@ export async function getStats(storeId: string) {
 
 // ===== التنبيهات =====
 
-export async function getNotifications(): Promise<Notification[]> {
+export async function getNotifications(storeId: string): Promise<Notification[]> {
   const result = await pool.query(
-    'SELECT * FROM notifications ORDER BY created_at DESC LIMIT 50'
+    'SELECT * FROM notifications WHERE store_id = $1 ORDER BY created_at DESC LIMIT 50',
+    [storeId]
   );
   return result.rows.map(mapNotification);
 }
 
 export async function addNotification(
+  storeId: string,
   type: Notification['type'],
   message: string,
   extra?: { productId?: string; orderId?: string }
 ): Promise<Notification> {
   const result = await pool.query(
-    `INSERT INTO notifications (type, message, product_id, order_id)
-     VALUES ($1, $2, $3, $4) RETURNING *`,
-    [type, message, extra?.productId || null, extra?.orderId || null]
+    `INSERT INTO notifications (store_id, type, message, product_id, order_id)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [storeId, type, message, extra?.productId || null, extra?.orderId || null]
   );
   return mapNotification(result.rows[0]);
 }
@@ -188,6 +190,7 @@ export async function addNotification(
 function mapProduct(row: any): Product {
   return {
     id: row.id,
+    storeId: row.store_id,
     name: row.name,
     price: parseFloat(row.price),
     quantity: row.quantity,
@@ -202,6 +205,7 @@ function mapProduct(row: any): Product {
 function mapOrder(row: any): Omit<Order, 'items'> & { items: any[] } {
   return {
     id: row.id,
+    storeId: row.store_id,
     customerName: row.customer_name,
     customerPhone: row.customer_phone,
     source: row.source,
@@ -217,6 +221,7 @@ function mapOrder(row: any): Omit<Order, 'items'> & { items: any[] } {
 function mapNotification(row: any): Notification {
   return {
     id: row.id,
+    storeId: row.store_id,
     type: row.type,
     message: row.message,
     productId: row.product_id,
