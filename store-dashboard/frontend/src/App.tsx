@@ -1,5 +1,4 @@
 import Login from './pages/Login';
-import AuthCallback from './pages/AuthCallback';
 import { useState, useEffect, useCallback } from 'react';
 import { socket, api, Product, Order, StoreStats, Notification } from './api';
 import Dashboard from './pages/Dashboard';
@@ -17,7 +16,7 @@ export default function App() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [creatingStore, setCreatingStore] = useState(false);
   const [newStoreName, setNewStoreName] = useState('');
   const [storeError, setStoreError] = useState('');
@@ -36,7 +35,6 @@ export default function App() {
   const handleLogin = (newToken: string, user: any) => {
     setToken(newToken);
     setCurrentUser(user);
-    // اقرأ store_id من localStorage بعد ما Login.tsx حفظه
     setCurrentStoreId(localStorage.getItem('store_id'));
     setStoreName(localStorage.getItem('store_name'));
   };
@@ -54,7 +52,6 @@ export default function App() {
     setOrders([]);
     setStats(null);
     setNotifications([]);
-    setLoading(true);
   };
 
   const handleCreateStore = async () => {
@@ -124,11 +121,7 @@ export default function App() {
     };
   }, [currentStoreId]);
 
-  // ===== الـ returns المشروطة بعد كل الـ hooks =====
-
-  if (window.location.pathname === '/auth/callback') {
-    return <AuthCallback onLogin={handleLogin} />;
-  }
+  // ===== الـ returns المشروطة =====
 
   if (!token || !currentUser) {
     return <Login onLogin={handleLogin} />;
