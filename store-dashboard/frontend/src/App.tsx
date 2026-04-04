@@ -1,4 +1,5 @@
 import Login from './pages/Login';
+import AuthCallback from './pages/AuthCallback';
 import { useState, useEffect, useCallback } from 'react';
 import { socket, api, Product, Order, StoreStats, Notification } from './api';
 import Dashboard from './pages/Dashboard';
@@ -38,6 +39,11 @@ export default function App() {
     setToken(null);
     setCurrentUser(null);
   };
+
+  // معالجة مسار العودة من المصادقة
+  if (window.location.pathname === '/auth/callback') {
+    return <AuthCallback onLogin={handleLogin} />;
+  }
 
   // التحقق من المصادقة قبل تحميل البيانات
   if (!token || !currentUser) {
