@@ -27,11 +27,9 @@ app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.use(passport.initialize());
 
-// ===== المصادقة والمتاجر =====
 app.use('/auth', authRouter);
 app.use('/stores', storesRouter);
 
-// ===== ميدلوير للتحقق من المتجر =====
 async function requireStore(req: any, res: any, next: any) {
   const storeId = req.headers['x-store-id'] as string;
   if (!storeId) return res.status(400).json({ error: 'معرف المتجر مطلوب في الهيدر' });
@@ -43,8 +41,6 @@ async function requireStore(req: any, res: any, next: any) {
   req.memberRole = role;
   next();
 }
-
-// ===== واجهة برمجة التطبيقات — تحتاج تسجيل دخول + متجر =====
 
 app.get('/api/products', authMiddleware, requireStore, async (req: any, res) => {
   try { res.json(await getProducts(req.storeId)); }
@@ -62,7 +58,7 @@ app.get('/api/stats', authMiddleware, requireStore, async (req: any, res) => {
 });
 
 app.get('/api/notifications', authMiddleware, requireStore, async (req: any, res) => {
-  try { res.json(await getNotifications()); }
+  try { res.json(await getNotifications(req.storeId)); }
   catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
@@ -81,7 +77,7 @@ app.post('/api/products', authMiddleware, requireStore, async (req: any, res) =>
     const product = await addProduct({ ...req.body, storeId: req.storeId });
     io.to(req.storeId).emit('product_added', product);
     io.to(req.storeId).emit('stats_updated', await getStats(req.storeId));
-    const notification = await addNotification('معلومة', `تمت إضافة منتج: ${product.name}`);
+    const notification = await addNotification(req.storeId, 'معلومة', `تمت إضافة منتج: ${product.name}`);
     io.to(req.storeId).emit('notification', notification);
     res.status(201).json(product);
   } catch (err: any) { res.status(500).json({ error: err.message }); }
@@ -95,7 +91,7 @@ app.put('/api/products/:id', authMiddleware, requireStore, async (req: any, res)
     io.to(req.storeId).emit('stats_updated', await getStats(req.storeId));
     const aiMessage = analyzeInventory(updated);
     if (aiMessage) {
-      const n = await addNotification('تحذير_مخزون', aiMessage);
+      const n = await addNotification(req.storeId, 'تحذير_مخزون', aiMessage);
       io.to(req.storeId).emit('notification', n);
     }
     res.json(updated);
@@ -117,7 +113,7 @@ app.post('/api/orders', authMiddleware, requireStore, async (req: any, res) => {
     const order = await addOrder({ ...req.body, storeId: req.storeId });
     io.to(req.storeId).emit('order_added', order);
     io.to(req.storeId).emit('stats_updated', await getStats(req.storeId));
-    const n = await addNotification('طلب_جديد', `طلب جديد من ${order.customerName}`);
+    const n = await addNotification(req.storeId, 'طلب_جديد', `طلب جديد من ${order.customerName}`);
     io.to(req.storeId).emit('notification', n);
     const products = await getProducts(req.storeId);
     for (const item of order.items) {
@@ -126,7 +122,7 @@ app.post('/api/orders', authMiddleware, requireStore, async (req: any, res) => {
         io.to(req.storeId).emit('product_updated', product);
         const aiMsg = analyzeInventory(product);
         if (aiMsg) {
-          const an = await addNotification('تحذير_مخزون', aiMsg);
+          const an = await addNotification(req.storeId, 'تحذير_مخزون', aiMsg);
           io.to(req.storeId).emit('notification', an);
         }
       }
@@ -141,7 +137,7 @@ app.put('/api/orders/:id/status', authMiddleware, requireStore, async (req: any,
     if (!order) return res.status(404).json({ error: 'الطلب غير موجود' });
     io.to(req.storeId).emit('order_updated', order);
     if (order.status === 'مكتمل') {
-      const n = await addNotification('طلب_مكتمل', `اكتمل طلب ${order.customerName} 🎉`);
+      const n = await addNotification(req.storeId, 'طلب_مكتمل', `اكتمل طلب ${order.customerName} 🎉`);
       io.to(req.storeId).emit('notification', n);
     }
     io.to(req.storeId).emit('stats_updated', await getStats(req.storeId));
@@ -149,7 +145,6 @@ app.put('/api/orders/:id/status', authMiddleware, requireStore, async (req: any,
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
-// ===== ويب سوكيتس — غرف المتاجر =====
 let connectedUsers = 0;
 io.on('connection', (socket) => {
   connectedUsers++;
