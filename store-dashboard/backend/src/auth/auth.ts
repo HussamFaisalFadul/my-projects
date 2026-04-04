@@ -1,4 +1,3 @@
-
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../db/connection';
@@ -14,12 +13,11 @@ export interface UserPayload {
   avatarUrl?: string;
 }
 
-// إنشاء توكن
+// --- وظائف التوكن ---
 export function generateToken(user: UserPayload): string {
   return jwt.sign(user, JWT_SECRET, { expiresIn: JWT_EXPIRES });
 }
 
-// التحقق من التوكن
 export function verifyToken(token: string): UserPayload | null {
   try {
     return jwt.verify(token, JWT_SECRET) as UserPayload;
@@ -28,31 +26,47 @@ export function verifyToken(token: string): UserPayload | null {
   }
 }
 
-// تسجيل مستخدم جديد بالإيميل
-export async function registerUser(
-  name: string,
-  email: string,
-  password: string
-): Promise<{ user: UserPayload; token: string } | null> {
+// --- دالة النجاح المعدلة لـ Vercel (حل مشكلة الصفحة الفارغة) ---
+export const handleLoginSuccess = async (reply: any, user: UserPayload) => {
+  const token = generateToken(user);
+
+  // تخزين في الجلسة (للسيرفر)
+  if (reply.request.session) {
+    reply.request.session.user = user;
+  }
+
+  // إرسال الكوكيز بإعدادات تسمح بمروره للمتصفح (للفورنت أند)
+  reply.setCookie('auth_token', token, {
+    path: '/',
+    secure: true,      // ضروري لـ Vercel (HTTPS)
+    sameSite: 'none',  // ضروري لأن الدومين مختلف
+    httpOnly: true,
+    maxAge: 60 * 60 * 24 * 7 // أسبوع
+  });
+
+  return reply.send({ 
+    success: true, 
+    user, 
+    token // نرسل التوكن أيضاً في الجسم لضمان وصوله للـ Flutter
+  });
+};
+
+// --- عمليات مستخدم الإيميل ---
+export async function registerUser(name: string, email: string, password: string) {
   const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
   if (existing.rows.length > 0) return null;
 
   const passwordHash = await bcrypt.hash(password, 12);
   const result = await pool.query(
-    `INSERT INTO users (name, email, password_hash)
-     VALUES ($1, $2, $3) RETURNING *`,
+    `INSERT INTO users (name, email, password_hash, role)
+     VALUES ($1, $2, $3, 'مستخدم') RETURNING *`,
     [name, email, passwordHash]
   );
 
-  const user = mapUser(result.rows[0]);
-  return { user, token: generateToken(user) };
+  return mapUser(result.rows[0]);
 }
 
-// تسجيل الدخول بالإيميل
-export async function loginUser(
-  email: string,
-  password: string
-): Promise<{ user: UserPayload; token: string } | null> {
+export async function loginUser(email: string, password: string) {
   const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
   if (result.rows.length === 0) return null;
 
@@ -62,62 +76,28 @@ export async function loginUser(
   const valid = await bcrypt.compare(password, row.password_hash);
   if (!valid) return null;
 
-  const user = mapUser(row);
-  return { user, token: generateToken(user) };
+  return mapUser(row);
 }
 
-// إيجاد أو إنشاء مستخدم جوجل
-export async function findOrCreateGoogleUser(
-  googleId: string,
-  email: string,
-  name: string,
-  avatarUrl?: string
-): Promise<{ user: UserPayload; token: string }> {
-  let result = await pool.query(
-    'SELECT * FROM users WHERE google_id = $1 OR email = $2',
-    [googleId, email]
-  );
-
-  let row;
-  if (result.rows.length === 0) {
-    const insert = await pool.query(
-      `INSERT INTO users (name, email, google_id, avatar_url)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [name, email, googleId, avatarUrl || null]
-    );
-    row = insert.rows[0];
-  } else {
-    row = result.rows[0];
-    if (!row.google_id) {
-      await pool.query(
-        'UPDATE users SET google_id = $1, avatar_url = $2 WHERE id = $3',
-        [googleId, avatarUrl, row.id]
-      );
-    }
-  }
-
-  const user = mapUser(row);
-  return { user, token: generateToken(user) };
-}
-
-// ميدلوير التحقق من التوكن
+// --- الميدلوير (Middlewares) ---
 export function authMiddleware(req: any, res: any, next: any) {
+  // نتحقق أولاً من الهيدر (Bearer) ثم من الكوكيز كخيار احتياطي
   const header = req.headers.authorization;
-  if (!header || !header.startsWith('Bearer ')) {
+  let token = (header && header.startsWith('Bearer ')) ? header.split(' ')[1] : req.cookies?.auth_token;
+
+  if (!token) {
     return res.status(401).json({ error: 'غير مصرح — يرجى تسجيل الدخول' });
   }
 
-  const token = header.split(' ')[1];
   const user = verifyToken(token);
   if (!user) {
-    return res.status(401).json({ error: 'التوكن غير صالح أو منتهي الصلاحية' });
+    return res.status(401).json({ error: 'الجلسة منتهية، يرجى تسجيل الدخول مجدداً' });
   }
 
   req.user = user;
   next();
 }
 
-// ميدلوير التحقق من صلاحية المدير
 export function adminMiddleware(req: any, res: any, next: any) {
   if (req.user?.role !== 'مدير') {
     return res.status(403).json({ error: 'هذه العملية تتطلب صلاحية مدير' });
@@ -125,12 +105,13 @@ export function adminMiddleware(req: any, res: any, next: any) {
   next();
 }
 
+// محول البيانات
 function mapUser(row: any): UserPayload {
   return {
-    id: row.id,
+    id: row.id.toString(),
     name: row.name,
     email: row.email,
-    role: row.role,
+    role: row.role || 'مستخدم',
     avatarUrl: row.avatar_url,
   };
 }
