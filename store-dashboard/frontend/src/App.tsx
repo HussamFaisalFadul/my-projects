@@ -34,10 +34,11 @@ export default function App() {
   );
 
   const handleLogin = (newToken: string, user: any) => {
-    localStorage.setItem('store_token', newToken);
-    localStorage.setItem('store_user', JSON.stringify(user));
     setToken(newToken);
     setCurrentUser(user);
+    // اقرأ store_id من localStorage بعد ما Login.tsx حفظه
+    setCurrentStoreId(localStorage.getItem('store_id'));
+    setStoreName(localStorage.getItem('store_name'));
   };
 
   const handleLogout = () => {
@@ -81,7 +82,7 @@ export default function App() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   }, []);
 
-  // ===== تحميل البيانات — كل الـ hooks قبل أي return =====
+  // ===== تحميل البيانات =====
   useEffect(() => {
     if (!token || !currentStoreId) return;
     setLoading(true);
@@ -123,7 +124,7 @@ export default function App() {
     };
   }, [currentStoreId]);
 
-  // ===== بعد كل الـ hooks — الـ returns المشروطة =====
+  // ===== الـ returns المشروطة بعد كل الـ hooks =====
 
   if (window.location.pathname === '/auth/callback') {
     return <AuthCallback onLogin={handleLogin} />;
@@ -136,7 +137,8 @@ export default function App() {
   if (!currentStoreId) {
     return (
       <div className="app" dir="rtl">
-        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '1rem 2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 2rem', borderBottom: '1px solid #eee' }}>
+          <span style={{ fontWeight: 600, color: '#444' }}>مرحباً، {currentUser.name}</span>
           <button onClick={handleLogout} style={{ background: 'none', border: '1px solid #ccc', borderRadius: 8, padding: '6px 16px', cursor: 'pointer', color: '#666' }}>
             تسجيل خروج
           </button>
@@ -144,7 +146,7 @@ export default function App() {
         <div style={{ maxWidth: 400, margin: '80px auto', padding: '2rem', background: 'white', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,0.08)', textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🏪</div>
           <h2 style={{ marginBottom: 8 }}>أنشئ متجرك</h2>
-          <p style={{ color: '#888', marginBottom: 24 }}>مرحباً {currentUser.name}! ابدأ بإنشاء متجرك الخاص.</p>
+          <p style={{ color: '#888', marginBottom: 24 }}>ابدأ بإنشاء متجرك الخاص مجاناً.</p>
           <input
             value={newStoreName}
             onChange={e => setNewStoreName(e.target.value)}
