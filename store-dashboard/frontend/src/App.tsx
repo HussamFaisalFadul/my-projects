@@ -6,6 +6,8 @@ import Products from './pages/Products';
 import Orders from './pages/Orders';
 import './App.css';
 
+const BACKEND = 'https://store-dashboard-backend.onrender.com';
+
 type Page = 'dashboard' | 'products' | 'orders';
 
 export default function App() {
@@ -20,6 +22,7 @@ export default function App() {
   const [creatingStore, setCreatingStore] = useState(false);
   const [newStoreName, setNewStoreName] = useState('');
   const [storeError, setStoreError] = useState('');
+  const [initializing, setInitializing] = useState(true);
 
   const [token, setToken] = useState<string | null>(localStorage.getItem('store_token'));
   const [currentUser, setCurrentUser] = useState<any>(
@@ -32,14 +35,37 @@ export default function App() {
     localStorage.getItem('store_name')
   );
 
- const handleLogin = (newToken: string, user: any) => {
-  setToken(newToken);
-  setCurrentUser(user);
-  setTimeout(() => {
-    setCurrentStoreId(localStorage.getItem('store_id'));
-    setStoreName(localStorage.getItem('store_name'));
-  }, 500);
-};
+  // ===== عند أول تحميل — لو عنده توكن بدون store_id اجلبه =====
+  useEffect(() => {
+    const savedToken = localStorage.getItem('store_token');
+    const savedStoreId = localStorage.getItem('store_id');
+
+    if (savedToken && !savedStoreId) {
+      fetch(`${BACKEND}/stores`, {
+        headers: { 'Authorization': `Bearer ${savedToken}` }
+      })
+        .then(r => r.json())
+        .then(stores => {
+          if (Array.isArray(stores) && stores.length > 0) {
+            localStorage.setItem('store_id', stores[0].id);
+            localStorage.setItem('store_name', stores[0].name);
+            setCurrentStoreId(stores[0].id);
+            setStoreName(stores[0].name);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setInitializing(false));
+    } else {
+      setInitializing(false);
+    }
+  }, []);
+
+  const handleLogin = (newToken: string, user: any, storeId?: string | null, sName?: string | null) => {
+    setToken(newToken);
+    setCurrentUser(user);
+    setCurrentStoreId(storeId || localStorage.getItem('store_id'));
+    setStoreName(sName || localStorage.getItem('store_name'));
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('store_token');
@@ -103,7 +129,6 @@ export default function App() {
   useEffect(() => {
     if (!currentStoreId) return;
     socket.emit('join_store', currentStoreId);
-
     socket.on('connect', () => setIsConnected(true));
     socket.on('disconnect', () => setIsConnected(false));
     socket.on('product_added', (product) => setProducts(prev => [...prev, product]));
@@ -113,7 +138,6 @@ export default function App() {
     socket.on('order_updated', (order) => setOrders(prev => prev.map(o => o.id === order.id ? order : o)));
     socket.on('stats_updated', (s) => setStats(s));
     socket.on('notification', (n) => setNotifications(prev => [n, ...prev].slice(0, 50)));
-
     return () => {
       socket.emit('leave_store', currentStoreId);
       socket.off('connect'); socket.off('disconnect');
@@ -123,7 +147,15 @@ export default function App() {
     };
   }, [currentStoreId]);
 
-  // ===== الـ returns المشروطة =====
+  // ===== شاشة تهيئة أولية =====
+  if (initializing) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner"></div>
+        <p>جاري التحميل...</p>
+      </div>
+    );
+  }
 
   if (!token || !currentUser) {
     return <Login onLogin={handleLogin} />;
