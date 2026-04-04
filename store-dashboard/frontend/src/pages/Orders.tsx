@@ -20,9 +20,7 @@ export default function Orders({ orders, products }: Props) {
     items: [] as { productId: string; productName: string; quantity: number; price: number }[],
   });
 
-  const filtered = filter === 'الكل'
-    ? orders
-    : orders.filter((o) => o.status === filter);
+  const filtered = filter === 'الكل' ? orders : orders.filter((o) => o.status === filter);
 
   const addItem = () => {
     const product = products.find((p) => p.id === form.selectedProduct);
@@ -31,12 +29,7 @@ export default function Orders({ orders, products }: Props) {
     if (exists) return;
     setForm({
       ...form,
-      items: [...form.items, {
-        productId: product.id,
-        productName: product.name,
-        quantity: form.selectedQty,
-        price: product.price,
-      }],
+      items: [...form.items, { productId: product.id, productName: product.name, quantity: form.selectedQty, price: product.price }],
       selectedProduct: '',
       selectedQty: 1,
     });
@@ -51,7 +44,9 @@ export default function Orders({ orders, products }: Props) {
   const handleSubmit = async () => {
     if (!form.customerName || form.items.length === 0) return;
     setSaving(true);
+    const storeId = localStorage.getItem('store_id') || '';
     await api.addOrder({
+      storeId,
       customerName: form.customerName,
       customerPhone: form.customerPhone,
       source: form.source,
@@ -62,10 +57,7 @@ export default function Orders({ orders, products }: Props) {
     });
     setSaving(false);
     setShowForm(false);
-    setForm({
-      customerName: '', customerPhone: '', source: 'واتساب',
-      notes: '', selectedProduct: '', selectedQty: 1, items: [],
-    });
+    setForm({ customerName: '', customerPhone: '', source: 'واتساب', notes: '', selectedProduct: '', selectedQty: 1, items: [] });
   };
 
   const handleStatusChange = async (orderId: string, status: Order['status']) => {
@@ -76,30 +68,18 @@ export default function Orders({ orders, products }: Props) {
     <div className="page">
       <div className="page-header">
         <div className="page-title">الطلبات ({orders.length})</div>
-        <button className="btn-primary" onClick={() => setShowForm(true)}>
-          + طلب جديد
-        </button>
+        <button className="btn-primary" onClick={() => setShowForm(true)}>+ طلب جديد</button>
       </div>
 
-      {/* فلتر الحالة */}
       <div className="filter-row">
         {(['الكل', 'جديد', 'قيد التنفيذ', 'مكتمل', 'ملغي'] as const).map((s) => (
-          <button
-            key={s}
-            className={`filter-btn ${filter === s ? 'active' : ''}`}
-            onClick={() => setFilter(s)}
-          >
+          <button key={s} className={`filter-btn ${filter === s ? 'active' : ''}`} onClick={() => setFilter(s)}>
             {s}
-            {s !== 'الكل' && (
-              <span className="filter-count">
-                {orders.filter((o) => o.status === s).length}
-              </span>
-            )}
+            {s !== 'الكل' && <span className="filter-count">{orders.filter((o) => o.status === s).length}</span>}
           </button>
         ))}
       </div>
 
-      {/* نموذج طلب جديد */}
       {showForm && (
         <div className="modal-overlay">
           <div className="modal wide">
@@ -127,31 +107,18 @@ export default function Orders({ orders, products }: Props) {
               </div>
             </div>
 
-            {/* إضافة منتجات للطلب */}
             <div className="order-items-section">
               <div className="items-header">المنتجات</div>
               <div className="add-item-row">
-                <select
-                  value={form.selectedProduct}
-                  onChange={(e) => setForm({ ...form, selectedProduct: e.target.value })}
-                >
+                <select value={form.selectedProduct} onChange={(e) => setForm({ ...form, selectedProduct: e.target.value })}>
                   <option value="">اختر منتجاً...</option>
                   {products.filter((p) => p.quantity > 0).map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} — {p.price} ر ({p.quantity} متاح)
-                    </option>
+                    <option key={p.id} value={p.id}>{p.name} — {p.price} ر ({p.quantity} متاح)</option>
                   ))}
                 </select>
-                <input
-                  type="number"
-                  min={1}
-                  value={form.selectedQty}
-                  onChange={(e) => setForm({ ...form, selectedQty: Number(e.target.value) })}
-                  style={{ width: '70px' }}
-                />
+                <input type="number" min={1} value={form.selectedQty} onChange={(e) => setForm({ ...form, selectedQty: Number(e.target.value) })} style={{ width: '70px' }} />
                 <button className="btn-secondary" onClick={addItem}>إضافة</button>
               </div>
-
               {form.items.map((item) => (
                 <div key={item.productId} className="order-item">
                   <span>{item.productName}</span>
@@ -159,10 +126,7 @@ export default function Orders({ orders, products }: Props) {
                   <button className="btn-delete small" onClick={() => removeItem(item.productId)}>×</button>
                 </div>
               ))}
-
-              {form.items.length > 0 && (
-                <div className="order-total">الإجمالي: {totalPrice} ريال</div>
-              )}
+              {form.items.length > 0 && <div className="order-total">الإجمالي: {totalPrice} ريال</div>}
             </div>
 
             <div className="modal-actions">
@@ -175,7 +139,6 @@ export default function Orders({ orders, products }: Props) {
         </div>
       )}
 
-      {/* قائمة الطلبات */}
       <div className="orders-list">
         {filtered.map((order) => (
           <div key={order.id} className={`order-card ${order.status === 'مكتمل' ? 'done' : order.status === 'ملغي' ? 'cancelled' : ''}`}>
@@ -191,21 +154,10 @@ export default function Orders({ orders, products }: Props) {
                 <div className="order-price">{order.totalPrice} ريال</div>
               </div>
             </div>
-
-            {order.notes && (
-              <div className="order-notes">📝 {order.notes}</div>
-            )}
-
-            <div className="order-time">
-              {new Date(order.createdAt).toLocaleString('ar-SA')}
-            </div>
-
+            {order.notes && <div className="order-notes">📝 {order.notes}</div>}
+            <div className="order-time">{new Date(order.createdAt).toLocaleString('ar-SA')}</div>
             <div className="order-footer">
-              <select
-                value={order.status}
-                onChange={(e) => handleStatusChange(order.id, e.target.value as Order['status'])}
-                className={`status-select ${order.status === 'مكتمل' ? 'done' : order.status === 'جديد' ? 'new' : order.status === 'ملغي' ? 'cancelled' : 'pending'}`}
-              >
+              <select value={order.status} onChange={(e) => handleStatusChange(order.id, e.target.value as Order['status'])} className={`status-select ${order.status === 'مكتمل' ? 'done' : order.status === 'جديد' ? 'new' : order.status === 'ملغي' ? 'cancelled' : 'pending'}`}>
                 <option>جديد</option>
                 <option>قيد التنفيذ</option>
                 <option>مكتمل</option>
@@ -216,9 +168,7 @@ export default function Orders({ orders, products }: Props) {
         ))}
       </div>
 
-      {filtered.length === 0 && (
-        <div className="empty">لا توجد طلبات في هذه الحالة</div>
-      )}
+      {filtered.length === 0 && <div className="empty">لا توجد طلبات في هذه الحالة</div>}
     </div>
   );
 }
