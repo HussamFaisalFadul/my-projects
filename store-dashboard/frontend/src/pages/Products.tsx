@@ -21,17 +21,17 @@ export default function Products({ products }: Props) {
   const [search, setSearch] = useState('');
 
   const filtered = products.filter(
-    (p) =>
-      p.name.includes(search) || p.category.includes(search)
+    (p) => p.name.includes(search) || p.category.includes(search)
   );
 
   const handleSubmit = async () => {
     if (!form.name || !form.price) return;
     setSaving(true);
+    const storeId = localStorage.getItem('store_id') || '';
     if (editingId) {
       await api.updateProduct(editingId, form);
     } else {
-      await api.addProduct(form);
+      await api.addProduct({ ...form, storeId });
     }
     setSaving(false);
     setShowForm(false);
@@ -70,7 +70,6 @@ export default function Products({ products }: Props) {
         </button>
       </div>
 
-      {/* بحث */}
       <input
         className="search-input"
         placeholder="ابحث باسم المنتج أو الفئة..."
@@ -78,7 +77,6 @@ export default function Products({ products }: Props) {
         onChange={(e) => setSearch(e.target.value)}
       />
 
-      {/* نموذج الإضافة/التعديل */}
       {showForm && (
         <div className="modal-overlay">
           <div className="modal">
@@ -88,68 +86,41 @@ export default function Products({ products }: Props) {
             <div className="form-grid">
               <div className="form-group">
                 <label>اسم المنتج</label>
-                <input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="مثال: عباية سوداء فاخرة"
-                />
+                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="مثال: عباية سوداء فاخرة" />
               </div>
               <div className="form-group">
                 <label>الفئة</label>
-                <input
-                  value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  placeholder="مثال: عبايات"
-                />
+                <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="مثال: عبايات" />
               </div>
               <div className="form-group">
                 <label>السعر (ريال)</label>
-                <input
-                  type="number"
-                  value={form.price}
-                  onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
-                />
+                <input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} />
               </div>
               <div className="form-group">
                 <label>الكمية المتاحة</label>
-                <input
-                  type="number"
-                  value={form.quantity}
-                  onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })}
-                />
+                <input type="number" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })} />
               </div>
               <div className="form-group">
                 <label>الحد الأدنى للتنبيه</label>
-                <input
-                  type="number"
-                  value={form.minQuantity}
-                  onChange={(e) => setForm({ ...form, minQuantity: Number(e.target.value) })}
-                />
+                <input type="number" value={form.minQuantity} onChange={(e) => setForm({ ...form, minQuantity: Number(e.target.value) })} />
               </div>
             </div>
             <div className="modal-actions">
               <button className="btn-primary" onClick={handleSubmit} disabled={saving}>
                 {saving ? 'جاري الحفظ...' : editingId ? 'حفظ التعديلات' : 'إضافة المنتج'}
               </button>
-              <button className="btn-secondary" onClick={() => setShowForm(false)}>
-                إلغاء
-              </button>
+              <button className="btn-secondary" onClick={() => setShowForm(false)}>إلغاء</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* قائمة المنتجات */}
       <div className="products-grid">
         {filtered.map((product) => (
-          <div
-            key={product.id}
-            className={`product-card ${product.quantity === 0 ? 'out-of-stock' : product.quantity <= product.minQuantity ? 'low-stock' : ''}`}
-          >
+          <div key={product.id} className={`product-card ${product.quantity === 0 ? 'out-of-stock' : product.quantity <= product.minQuantity ? 'low-stock' : ''}`}>
             <div className="product-category">{product.category}</div>
             <div className="product-name">{product.name}</div>
             <div className="product-price">{product.price} ريال</div>
-
             <div className="quantity-control">
               <button onClick={() => handleQuantityChange(product, -1)} disabled={product.quantity === 0}>−</button>
               <span className={`quantity ${product.quantity === 0 ? 'zero' : product.quantity <= product.minQuantity ? 'low' : ''}`}>
@@ -157,14 +128,8 @@ export default function Products({ products }: Props) {
               </span>
               <button onClick={() => handleQuantityChange(product, 1)}>+</button>
             </div>
-
-            {product.quantity === 0 && (
-              <div className="stock-warning out">⛔ نفد المخزون</div>
-            )}
-            {product.quantity > 0 && product.quantity <= product.minQuantity && (
-              <div className="stock-warning low">⚠️ مخزون منخفض</div>
-            )}
-
+            {product.quantity === 0 && <div className="stock-warning out">⛔ نفد المخزون</div>}
+            {product.quantity > 0 && product.quantity <= product.minQuantity && <div className="stock-warning low">⚠️ مخزون منخفض</div>}
             <div className="product-actions">
               <button className="btn-edit" onClick={() => handleEdit(product)}>تعديل</button>
               <button className="btn-delete" onClick={() => handleDelete(product.id)}>حذف</button>
@@ -173,9 +138,7 @@ export default function Products({ products }: Props) {
         ))}
       </div>
 
-      {filtered.length === 0 && (
-        <div className="empty">لا توجد منتجات — أضف منتجك الأول!</div>
-      )}
+      {filtered.length === 0 && <div className="empty">لا توجد منتجات — أضف منتجك الأول!</div>}
     </div>
   );
 }
