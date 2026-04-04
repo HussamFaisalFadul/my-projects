@@ -13,7 +13,7 @@ export interface UserPayload {
   avatarUrl?: string;
 }
 
-// --- وظائف التوكن ---
+// ===== التوكن =====
 export function generateToken(user: UserPayload): string {
   return jwt.sign(user, JWT_SECRET, { expiresIn: JWT_EXPIRES });
 }
@@ -26,47 +26,30 @@ export function verifyToken(token: string): UserPayload | null {
   }
 }
 
-// --- دالة النجاح المعدلة لـ Vercel (حل مشكلة الصفحة الفارغة) ---
-export const handleLoginSuccess = async (reply: any, user: UserPayload) => {
-  const token = generateToken(user);
-
-  // تخزين في الجلسة (للسيرفر)
-  if (reply.request.session) {
-    reply.request.session.user = user;
-  }
-
-  // إرسال الكوكيز بإعدادات تسمح بمروره للمتصفح (للفورنت أند)
-  reply.setCookie('auth_token', token, {
-    path: '/',
-    secure: true,      // ضروري لـ Vercel (HTTPS)
-    sameSite: 'none',  // ضروري لأن الدومين مختلف
-    httpOnly: true,
-    maxAge: 60 * 60 * 24 * 7 // أسبوع
-  });
-
-  return reply.send({ 
-    success: true, 
-    user, 
-    token // نرسل التوكن أيضاً في الجسم لضمان وصوله للـ Flutter
-  });
-};
-
-// --- عمليات مستخدم الإيميل ---
-export async function registerUser(name: string, email: string, password: string) {
+// ===== الإيميل وكلمة المرور =====
+export async function registerUser(
+  name: string,
+  email: string,
+  password: string
+): Promise<{ user: UserPayload; token: string } | null> {
   const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
   if (existing.rows.length > 0) return null;
 
   const passwordHash = await bcrypt.hash(password, 12);
   const result = await pool.query(
-    `INSERT INTO users (name, email, password_hash, role)
-     VALUES ($1, $2, $3, 'مستخدم') RETURNING *`,
+    `INSERT INTO users (name, email, password_hash)
+     VALUES ($1, $2, $3) RETURNING *`,
     [name, email, passwordHash]
   );
 
-  return mapUser(result.rows[0]);
+  const user = mapUser(result.rows[0]);
+  return { user, token: generateToken(user) };
 }
 
-export async function loginUser(email: string, password: string) {
+export async function loginUser(
+  email: string,
+  password: string
+): Promise<{ user: UserPayload; token: string } | null> {
   const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
   if (result.rows.length === 0) return null;
 
@@ -76,19 +59,54 @@ export async function loginUser(email: string, password: string) {
   const valid = await bcrypt.compare(password, row.password_hash);
   if (!valid) return null;
 
-  return mapUser(row);
+  const user = mapUser(row);
+  return { user, token: generateToken(user) };
 }
 
-// --- الميدلوير (Middlewares) ---
-export function authMiddleware(req: any, res: any, next: any) {
-  // نتحقق أولاً من الهيدر (Bearer) ثم من الكوكيز كخيار احتياطي
-  const header = req.headers.authorization;
-  let token = (header && header.startsWith('Bearer ')) ? header.split(' ')[1] : req.cookies?.auth_token;
+// ===== جوجل OAuth =====
+export async function findOrCreateGoogleUser(
+  googleId: string,
+  email: string,
+  name: string,
+  avatarUrl?: string
+): Promise<{ user: UserPayload; token: string }> {
+  let result = await pool.query(
+    'SELECT * FROM users WHERE google_id = $1 OR email = $2',
+    [googleId, email]
+  );
 
-  if (!token) {
+  let row;
+  if (result.rows.length === 0) {
+    const insert = await pool.query(
+      `INSERT INTO users (name, email, google_id, avatar_url)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [name, email, googleId, avatarUrl || null]
+    );
+    row = insert.rows[0];
+  } else {
+    row = result.rows[0];
+    if (!row.google_id) {
+      await pool.query(
+        'UPDATE users SET google_id = $1, avatar_url = $2 WHERE id = $3',
+        [googleId, avatarUrl, row.id]
+      );
+      row.google_id = googleId;
+      row.avatar_url = avatarUrl;
+    }
+  }
+
+  const user = mapUser(row);
+  return { user, token: generateToken(user) };
+}
+
+// ===== الميدلوير =====
+export function authMiddleware(req: any, res: any, next: any) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'غير مصرح — يرجى تسجيل الدخول' });
   }
 
+  const token = header.split(' ')[1];
   const user = verifyToken(token);
   if (!user) {
     return res.status(401).json({ error: 'الجلسة منتهية، يرجى تسجيل الدخول مجدداً' });
@@ -105,10 +123,9 @@ export function adminMiddleware(req: any, res: any, next: any) {
   next();
 }
 
-// محول البيانات
 function mapUser(row: any): UserPayload {
   return {
-    id: row.id.toString(),
+    id: row.id,
     name: row.name,
     email: row.email,
     role: row.role || 'مستخدم',
