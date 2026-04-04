@@ -85,10 +85,14 @@ router.get('/me', authMiddleware, (req: any, res: Response) => {
 
 // بدء تسجيل الدخول بجوجل
 router.get('/google',
-  passport.authenticate('google', {
-    scope: ['profile', 'email'],
-    session: false
-  })
+  (req: any, res: any, next: any) => {
+    const prompt = req.query.prompt === 'select_account' ? 'select_account' : undefined;
+    passport.authenticate('google', {
+      scope: ['profile', 'email'],
+      session: false,
+      ...(prompt ? { prompt } : {}),
+    })(req, res, next);
+  }
 );
 
 // استقبال رد جوجل
