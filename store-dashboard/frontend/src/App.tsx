@@ -35,11 +35,10 @@ export default function App() {
  const handleLogin = (newToken: string, user: any) => {
   setToken(newToken);
   setCurrentUser(user);
-  // انتظر قليلاً ثم اقرأ من localStorage
   setTimeout(() => {
     setCurrentStoreId(localStorage.getItem('store_id'));
     setStoreName(localStorage.getItem('store_name'));
-  }, 100);
+  }, 500);
 };
 
   const handleLogout = () => {
