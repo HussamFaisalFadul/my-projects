@@ -1,11 +1,13 @@
 import { Product, Order, Notification } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
-// قاعدة بيانات في الذاكرة — ستستبدلها لاحقاً بقاعدة بيانات حقيقية
+const DEMO_STORE_ID = 'demo-store-id';
+
 export const db = {
   products: [
     {
       id: uuidv4(),
+      storeId: DEMO_STORE_ID,
       name: 'عباية سوداء فاخرة',
       price: 250,
       quantity: 15,
@@ -16,6 +18,7 @@ export const db = {
     },
     {
       id: uuidv4(),
+      storeId: DEMO_STORE_ID,
       name: 'شيلة بيضاء',
       price: 85,
       quantity: 3,
@@ -26,6 +29,7 @@ export const db = {
     },
     {
       id: uuidv4(),
+      storeId: DEMO_STORE_ID,
       name: 'عطر ورد الطائف',
       price: 320,
       quantity: 8,
@@ -36,6 +40,7 @@ export const db = {
     },
     {
       id: uuidv4(),
+      storeId: DEMO_STORE_ID,
       name: 'كيس هدايا مطرز',
       price: 45,
       quantity: 2,
@@ -45,10 +50,10 @@ export const db = {
       updatedAt: new Date(),
     },
   ] as Product[],
-
   orders: [
     {
       id: uuidv4(),
+      storeId: DEMO_STORE_ID,
       customerName: 'أم محمد',
       customerPhone: '0501234567',
       source: 'واتساب' as const,
@@ -61,6 +66,7 @@ export const db = {
     },
     {
       id: uuidv4(),
+      storeId: DEMO_STORE_ID,
       customerName: 'سارة الأحمد',
       customerPhone: '0557654321',
       source: 'انستغرام' as const,
@@ -71,29 +77,19 @@ export const db = {
       updatedAt: new Date(),
     },
   ] as Order[],
-
   notifications: [] as Notification[],
   soldCounts: {} as Record<string, number>,
 };
 
-// حساب الإحصائيات
 export function calculateStats() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
-  const todayOrders = db.orders.filter(
-    (o) => new Date(o.createdAt) >= today
-  );
-
-  const lowStockProducts = db.products.filter(
-    (p) => p.quantity <= p.minQuantity
-  );
-
+  const todayOrders = db.orders.filter((o) => new Date(o.createdAt) >= today);
+  const lowStockProducts = db.products.filter((p) => p.quantity <= p.minQuantity);
   const topProducts = db.products
     .map((p) => ({ product: p, soldCount: db.soldCounts[p.id] || 0 }))
     .sort((a, b) => b.soldCount - a.soldCount)
     .slice(0, 5);
-
   return {
     totalProducts: db.products.length,
     totalOrders: db.orders.length,
@@ -104,7 +100,6 @@ export function calculateStats() {
   };
 }
 
-// إنشاء تنبيه
 export function createNotification(
   type: Notification['type'],
   message: string,
