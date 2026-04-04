@@ -1,43 +1,38 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import cookie from '@fastify/cookie'; // تأكد من تنصيب @fastify/cookie
+import cookie from '@fastify/cookie';
 import session from '@fastify/session';
 import { authRoutes } from './auth/routes';
 import { storeRoutes } from './stores/routes';
 
 const app = Fastify({ logger: true });
 
-// 1. إعداد الـ CORS للسماح بالرابط الخاص بك
+// إعداد CORS للسماح لمتصفح المستخدم بالوصول للسيرفر من رابط Vercel
 app.register(cors, {
-  origin: "https://my-projects-bv31.vercel.app",
-  credentials: true, // ضروري جداً للسماح بالكوكيز
+  origin: "https://my-projects-bv31.vercel.app", // رابط مشروعك
+  credentials: true, // ضروري جداً لتبادل الكوكيز والجلسة
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 });
 
-// 2. إعداد الكوكيز
 app.register(cookie);
 
-// 3. إعداد الجلسة (Session) لتتوافق مع Vercel و HTTPS
 app.register(session, {
-  secret: 'a-very-long-secret-key-1234567890123456', // غير هذا المفتاح في الإنتاج
+  secret: 'a-very-long-secret-key-1234567890123456',
   cookieName: 'sessionId',
   cookie: { 
-    secure: true, // لأن Vercel يستخدم https
-    sameSite: 'none', // للسماح بالكوكيز عبر النطاقات المختلفة
+    secure: true,      // لأن Vercel يستخدم HTTPS
+    sameSite: 'none',  // للسماح بالكوكيز بين دومين Frontend ودومين Backend
     httpOnly: true,
-    maxAge: 86400000 // يوم واحد
+    maxAge: 86400000 
   }
 });
 
+// تسجيل المسارات التي تم تعريفها في ملفات الـ Routes
 app.register(authRoutes, { prefix: '/api/auth' });
 app.register(storeRoutes, { prefix: '/api/stores' });
 
-const start = async () => {
-  try {
-    await app.listen({ port: 3000, host: '0.0.0.0' });
-  } catch (err) {
-    app.log.error(err);
-    process.exit(1);
-  }
+// تصدير التطبيق ليعمل كـ Serverless Function على Vercel
+export default async (req: any, res: any) => {
+  await app.ready();
+  app.server.emit('request', req, res);
 };
-start();
