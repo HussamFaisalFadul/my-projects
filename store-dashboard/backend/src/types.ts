@@ -1,10 +1,51 @@
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatarUrl?: string;
+}
+
+export interface Store {
+  id: string;
+  name: string;
+  description?: string;
+  logoUrl?: string;
+  ownerId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface StoreMember {
+  id: string;
+  storeId: string;
+  userId: string;
+  role: 'مالك' | 'مدير' | 'موظف';
+  invitedBy?: string;
+  joinedAt: Date;
+  user?: User;
+}
+
+export interface Invitation {
+  id: string;
+  storeId: string;
+  email: string;
+  role: string;
+  token: string;
+  invitedBy: string;
+  acceptedAt?: Date;
+  expiresAt: Date;
+  createdAt: Date;
+}
+
 export interface Product {
   id: string;
+  storeId: string;
   name: string;
   price: number;
   quantity: number;
   category: string;
-  minQuantity: number; // الحد الأدنى قبل التنبيه
+  minQuantity: number;
   imageUrl?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -12,6 +53,7 @@ export interface Product {
 
 export interface Order {
   id: string;
+  storeId: string;
   customerName: string;
   customerPhone: string;
   source: 'واتساب' | 'انستغرام' | 'مباشر';
@@ -41,6 +83,7 @@ export interface StoreStats {
 
 export interface Notification {
   id: string;
+  storeId?: string;
   type: 'تحذير_مخزون' | 'طلب_جديد' | 'طلب_مكتمل' | 'معلومة';
   message: string;
   productId?: string;
@@ -49,7 +92,6 @@ export interface Notification {
   read: boolean;
 }
 
-// أحداث الوقت الحقيقي
 export interface ServerToClientEvents {
   product_updated: (product: Product) => void;
   product_added: (product: Product) => void;
@@ -63,7 +105,5 @@ export interface ServerToClientEvents {
 
 export interface ClientToServerEvents {
   join_store: (storeId: string) => void;
-  update_product: (product: Partial<Product> & { id: string }) => void;
-  add_order: (order: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  update_order_status: (data: { orderId: string; status: Order['status'] }) => void;
+  leave_store: (storeId: string) => void;
 }
