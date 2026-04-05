@@ -82,6 +82,8 @@ export async function getOrders(storeId: string): Promise<Order[]> {
   );
   const orders = ordersResult.rows;
 
+  if (orders.length === 0) return [];
+
   const itemsResult = await pool.query(
     'SELECT * FROM order_items WHERE order_id = ANY($1)',
     [orders.map(o => o.id)]
