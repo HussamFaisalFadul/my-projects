@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, Product as ApiProduct, socket } from '../api';
 import BarcodeScanner from '../BarcodeScanner';
+
+// تعريف الـ Props بشكل صحيح خارج المكون
 interface ProductsProps {
-  products: Product[];
+  products: ApiProduct[];   // استخدم ApiProduct من الاستيراد
 }
 
 export default function Products({ products }: ProductsProps) {
