@@ -1,5 +1,41 @@
 import { io, Socket } from 'socket.io-client';
 
+export interface ProductImage {
+  id: string;
+  productId: string;
+  url: string;
+  isPrimary: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  title: string;
+  attributes: Record<string, string>;
+  price: number;
+  costPrice: number;
+  quantity: number;
+  sku?: string;
+  imageUrl?: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export interface StockMovement {
+  id: string;
+  productId: string;
+  storeId: string;
+  type: 'purchase' | 'sale' | 'return' | 'adjustment' | 'damage';
+  quantityChange: number;
+  quantityBefore: number;
+  quantityAfter: number;
+  unitPrice: number;
+  note?: string;
+  createdAt: string;
+}
+
 export interface Product {
   id: string;
   storeId: string;
@@ -9,14 +45,22 @@ export interface Product {
   category: string;
   minQuantity: number;
   imageUrl?: string;
-  // 🔥 الحقول الجديدة (متطابقة مع الخلفية)
   sku?: string;
   barcode?: string;
+  description?: string;
+  brand?: string;
   costPrice?: number;
-  discountType?: string;
-  discountValue?: number;
-  tags?: string[];        // مصفوفة نصوص
-  status?: string;        // 'published', 'draft', إلخ
+  salePrice?: number;
+  saleStart?: string;
+  saleEnd?: string;
+  weightKg?: number;
+  taxRate?: number;
+  unit?: string;
+  isActive?: boolean;
+  tags?: string[];
+  images?: ProductImage[];
+  variants?: ProductVariant[];
+  stockMovements?: StockMovement[];
   createdAt: string;
   updatedAt: string;
 }
@@ -78,20 +122,12 @@ export const socket: Socket = io(BACKEND_URL, {
 });
 
 export const api = {
+  // ===== المنتجات =====
   getProducts: (): Promise<Product[]> =>
     fetch(`${BACKEND_URL}/api/products`, { headers: authHeaders() }).then(r => r.json()),
 
-  getOrders: (): Promise<Order[]> =>
-    fetch(`${BACKEND_URL}/api/orders`, { headers: authHeaders() }).then(r => r.json()),
-
-  getStats: (): Promise<StoreStats> =>
-    fetch(`${BACKEND_URL}/api/stats`, { headers: authHeaders() }).then(r => r.json()),
-
-  getNotifications: (): Promise<Notification[]> =>
-    fetch(`${BACKEND_URL}/api/notifications`, { headers: authHeaders() }).then(r => r.json()),
-
-  getReport: (): Promise<{ report: string }> =>
-    fetch(`${BACKEND_URL}/api/report`, { headers: authHeaders() }).then(r => r.json()),
+  getProductById: (id: string): Promise<Product> =>
+    fetch(`${BACKEND_URL}/api/products/${id}`, { headers: authHeaders() }).then(r => r.json()),
 
   addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> =>
     fetch(`${BACKEND_URL}/api/products`, {
@@ -113,6 +149,26 @@ export const api = {
       headers: authHeaders(),
     }).then(r => r.json()),
 
+  // ===== حركة المخزون =====
+  getStockMovements: (productId: string): Promise<StockMovement[]> =>
+    fetch(`${BACKEND_URL}/api/products/${productId}/movements`, { headers: authHeaders() }).then(r => r.json()),
+
+  addStockMovement: (productId: string, data: {
+    type: StockMovement['type'];
+    quantityChange: number;
+    unitPrice?: number;
+    note?: string;
+  }): Promise<StockMovement> =>
+    fetch(`${BACKEND_URL}/api/products/${productId}/movements`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(data),
+    }).then(r => r.json()),
+
+  // ===== الطلبات =====
+  getOrders: (): Promise<Order[]> =>
+    fetch(`${BACKEND_URL}/api/orders`, { headers: authHeaders() }).then(r => r.json()),
+
   addOrder: (order: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>): Promise<Order> =>
     fetch(`${BACKEND_URL}/api/orders`, {
       method: 'POST',
@@ -126,6 +182,16 @@ export const api = {
       headers: authHeaders(),
       body: JSON.stringify({ status }),
     }).then(r => r.json()),
+
+  // ===== إحصائيات وتنبيهات =====
+  getStats: (): Promise<StoreStats> =>
+    fetch(`${BACKEND_URL}/api/stats`, { headers: authHeaders() }).then(r => r.json()),
+
+  getNotifications: (): Promise<Notification[]> =>
+    fetch(`${BACKEND_URL}/api/notifications`, { headers: authHeaders() }).then(r => r.json()),
+
+  getReport: (): Promise<{ report: string }> =>
+    fetch(`${BACKEND_URL}/api/report`, { headers: authHeaders() }).then(r => r.json()),
 
   // ===== المتاجر =====
   getMyStores: (): Promise<any[]> =>
