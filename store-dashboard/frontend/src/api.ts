@@ -121,6 +121,31 @@ export const socket: Socket = io(BACKEND_URL, {
   reconnection: true,
 });
 
+// ===== Cloudinary configuration =====
+const CLOUDINARY_CLOUD_NAME = 'dkcuv2stk';
+const CLOUDINARY_UPLOAD_PRESET = 'store-dashboard';
+
+export async function uploadImageToCloudinary(
+  file: File,
+  storeId: string,
+  folder: 'products' | 'logo' = 'products'
+): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+  formData.append('folder', `store-dashboard/stores/${storeId}/${folder}`);
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+    { method: 'POST', body: formData }
+  );
+
+  if (!response.ok) throw new Error('فشل رفع الصورة');
+  
+  const data = await response.json();
+  return data.secure_url; // URL الصورة الجاهزة للحفظ في قاعدة البيانات
+}
+
 export const api = {
   // ===== المنتجات =====
   getProducts: (): Promise<Product[]> =>
