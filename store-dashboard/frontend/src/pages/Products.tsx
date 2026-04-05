@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, Product as ApiProduct, socket } from '../api';
+import BarcodeScanner from '../BarcodeScanner';
 
 interface ProductImage {
   id: string;
@@ -61,11 +62,7 @@ const loadExtras = (): Record<string, any> => {
   const key = `${STORAGE_KEY}_${getStoreId()}`;
   const raw = localStorage.getItem(key);
   if (!raw) return {};
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
+  try { return JSON.parse(raw); } catch { return {}; }
 };
 
 const saveExtras = (extras: Record<string, any>) => {
@@ -153,6 +150,9 @@ export default function Products() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(clone(emptyForm));
   const [saving, setSaving] = useState(false);
+
+  // ← جديد: حالة الـ Scanner
+  const [showScanner, setShowScanner] = useState(false);
 
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
@@ -263,13 +263,7 @@ export default function Products() {
     if (!cleanUrl) return;
     const newImages = syncPrimaryImage([
       ...form.images,
-      {
-        id: createId(),
-        url: cleanUrl,
-        is_primary: form.images.length === 0,
-        sort_order: form.images.length,
-        source: 'url',
-      },
+      { id: createId(), url: cleanUrl, is_primary: form.images.length === 0, sort_order: form.images.length, source: 'url' },
     ]).map((img, idx) => ({ ...img, sort_order: idx }));
     setForm(prev => ({ ...prev, images: newImages }));
   };
@@ -342,13 +336,7 @@ export default function Products() {
   const updateVariantAttribute = (index: number, key: string, value: string) => {
     setForm(prev => {
       const next = [...prev.variants];
-      next[index] = {
-        ...next[index],
-        attributes: {
-          ...next[index].attributes,
-          [key]: value,
-        },
-      };
+      next[index] = { ...next[index], attributes: { ...next[index].attributes, [key]: value } };
       return { ...prev, variants: next };
     });
   };
@@ -358,13 +346,7 @@ export default function Products() {
       const next = [...prev.variants];
       const attrKeys = Object.keys(next[index].attributes);
       const baseKey = `attribute_${attrKeys.length + 1}`;
-      next[index] = {
-        ...next[index],
-        attributes: {
-          ...next[index].attributes,
-          [baseKey]: '',
-        },
-      };
+      next[index] = { ...next[index], attributes: { ...next[index].attributes, [baseKey]: '' } };
       return { ...prev, variants: next };
     });
   };
@@ -411,10 +393,7 @@ export default function Products() {
         cost_price: form.cost_price,
         unit: form.unit,
         is_active: form.is_active,
-        tags: form.tagsText
-          .split(',')
-          .map(t => t.trim())
-          .filter(Boolean),
+        tags: form.tagsText.split(',').map(t => t.trim()).filter(Boolean),
       };
 
       setProductExtras(savedProduct.id, extras);
@@ -498,7 +477,6 @@ export default function Products() {
 
   const filteredProducts = useMemo(() => {
     const s = search.trim().toLowerCase();
-
     const result = products.filter(p => {
       const matchesSearch =
         !s ||
@@ -508,38 +486,24 @@ export default function Products() {
         (p.barcode || '').toLowerCase().includes(s) ||
         (p.brand || '').toLowerCase().includes(s) ||
         (p.description || '').toLowerCase().includes(s);
-
       const matchesCategory = !filterCategory || p.category === filterCategory;
       const matchesLow = !filterLowStock || (p.quantity || 0) <= (p.minQuantity ?? 5);
       const matchesActive =
-        filterActive === 'all'
-          ? true
-          : filterActive === 'active'
-            ? p.is_active !== false
-            : p.is_active === false;
-
+        filterActive === 'all' ? true : filterActive === 'active' ? p.is_active !== false : p.is_active === false;
       return matchesSearch && matchesCategory && matchesLow && matchesActive;
     });
 
     const sorted = [...result];
     sorted.sort((a, b) => {
       switch (sortMode) {
-        case 'name':
-          return (a.name || '').localeCompare(b.name || '', 'ar');
-        case 'price_asc':
-          return (a.price || 0) - (b.price || 0);
-        case 'price_desc':
-          return (b.price || 0) - (a.price || 0);
-        case 'stock_asc':
-          return (a.quantity || 0) - (b.quantity || 0);
-        case 'stock_desc':
-          return (b.quantity || 0) - (a.quantity || 0);
-        case 'newest':
-        default:
-          return Number(new Date(b.createdAt || 0)) - Number(new Date(a.createdAt || 0));
+        case 'name': return (a.name || '').localeCompare(b.name || '', 'ar');
+        case 'price_asc': return (a.price || 0) - (b.price || 0);
+        case 'price_desc': return (b.price || 0) - (a.price || 0);
+        case 'stock_asc': return (a.quantity || 0) - (b.quantity || 0);
+        case 'stock_desc': return (b.quantity || 0) - (a.quantity || 0);
+        default: return Number(new Date(b.createdAt || 0)) - Number(new Date(a.createdAt || 0));
       }
     });
-
     return sorted;
   }, [products, search, filterCategory, filterLowStock, filterActive, sortMode]);
 
@@ -581,6 +545,15 @@ export default function Products() {
 
   return (
     <div className="products-page" dir="rtl">
+
+      {/* ← جديد: مكون الـ Scanner */}
+      {showScanner && (
+        <BarcodeScanner
+          onDetected={(code) => setForm(prev => ({ ...prev, barcode: code }))}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
+
       <div className="hero-card">
         <div>
           <p className="eyebrow">إدارة المنتجات</p>
@@ -599,26 +572,11 @@ export default function Products() {
       </div>
 
       <div className="stats-grid">
-        <div className="stat-card">
-          <span>عدد المنتجات</span>
-          <strong>{products.length}</strong>
-        </div>
-        <div className="stat-card">
-          <span>نشطة</span>
-          <strong>{activeCount}</strong>
-        </div>
-        <div className="stat-card warning">
-          <span>مخزون منخفض</span>
-          <strong>{lowStockCount}</strong>
-        </div>
-        <div className="stat-card">
-          <span>بصور</span>
-          <strong>{imageCount}</strong>
-        </div>
-        <div className="stat-card">
-          <span>إجمالي القيمة</span>
-          <strong>{formatMoney(totalValue)}</strong>
-        </div>
+        <div className="stat-card"><span>عدد المنتجات</span><strong>{products.length}</strong></div>
+        <div className="stat-card"><span>نشطة</span><strong>{activeCount}</strong></div>
+        <div className="stat-card warning"><span>مخزون منخفض</span><strong>{lowStockCount}</strong></div>
+        <div className="stat-card"><span>بصور</span><strong>{imageCount}</strong></div>
+        <div className="stat-card"><span>إجمالي القيمة</span><strong>{formatMoney(totalValue)}</strong></div>
       </div>
 
       <div className="filters-panel">
@@ -628,20 +586,15 @@ export default function Products() {
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-
         <select className="filter-select" value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
           <option value="">كل التصنيفات</option>
-          {categories.map(c => (
-            <option key={c} value={c}>{c}</option>
-          ))}
+          {categories.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-
         <select className="filter-select" value={filterActive} onChange={e => setFilterActive(e.target.value as any)}>
           <option value="all">كل الحالات</option>
           <option value="active">نشطة</option>
           <option value="inactive">موقوفة</option>
         </select>
-
         <select className="filter-select" value={sortMode} onChange={e => changeSort(e.target.value as SortMode)}>
           <option value="newest">الأحدث</option>
           <option value="name">الاسم</option>
@@ -650,7 +603,6 @@ export default function Products() {
           <option value="stock_asc">المخزون: من الأقل</option>
           <option value="stock_desc">المخزون: من الأعلى</option>
         </select>
-
         <button className={`filter-low-btn ${filterLowStock ? 'active' : ''}`} onClick={() => setFilterLowStock(v => !v)} type="button">
           {filterLowStock ? '✅' : '⚠️'} مخزون منخفض
         </button>
@@ -671,7 +623,6 @@ export default function Products() {
             const mainImage = getMainImage(p);
             const images = getPreviewImages(p);
             const hasSale = (p.sale_price || 0) > 0 && (p.sale_price || 0) < (p.price || 0);
-
             return (
               <article key={p.id} className={`product-card ${isLow ? 'low' : ''} ${p.is_active === false ? 'inactive' : ''}`}>
                 <div className="card-media">
@@ -684,30 +635,23 @@ export default function Products() {
                     </div>
                   </div>
                 </div>
-
                 <div className="card-body">
                   {productBadge(p)}
                   <h3 title={p.name}>{p.name}</h3>
                   <p className="card-subtitle">{p.category || 'بدون تصنيف'}</p>
-
                   <div className="price-row">
                     {hasSale ? (
-                      <>
-                        <strong className="sale-price">{formatMoney(p.sale_price)}</strong>
-                        <span className="old-price">{formatMoney(p.price)}</span>
-                      </>
+                      <><strong className="sale-price">{formatMoney(p.sale_price)}</strong><span className="old-price">{formatMoney(p.price)}</span></>
                     ) : (
                       <strong>{formatMoney(p.price)}</strong>
                     )}
                   </div>
-
                   <div className="meta-grid">
                     <div><span>المخزون</span><strong>{p.quantity || 0}</strong></div>
                     <div><span>الحد الأدنى</span><strong>{p.minQuantity ?? 5}</strong></div>
                     <div><span>SKU</span><strong>{p.sku || '—'}</strong></div>
                     <div><span>باركود</span><strong>{p.barcode || '—'}</strong></div>
                   </div>
-
                   {mode === 'advanced' && (
                     <div className="extra-lines">
                       <div><span>العلامة</span><strong>{p.brand || '—'}</strong></div>
@@ -716,7 +660,6 @@ export default function Products() {
                     </div>
                   )}
                 </div>
-
                 <div className="card-footer">
                   <div className="qty-control">
                     <button type="button" onClick={() => handleQuantityChange(p, -1, 'adjustment')}>−</button>
@@ -799,6 +742,7 @@ export default function Products() {
         </div>
       )}
 
+      {/* Modal: سجل الحركات */}
       {showMovementModal && selectedProductForLog && (
         <div className="modal-overlay" onClick={() => setShowMovementModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -812,12 +756,7 @@ export default function Products() {
             <div className="modal-body">
               <table className="movements-table">
                 <thead>
-                  <tr>
-                    <th>التاريخ</th>
-                    <th>التغيير</th>
-                    <th>السبب</th>
-                    <th>ملاحظة</th>
-                  </tr>
+                  <tr><th>التاريخ</th><th>التغيير</th><th>السبب</th><th>ملاحظة</th></tr>
                 </thead>
                 <tbody>
                   {(selectedProductForLog.stock_movements || []).map(m => (
@@ -833,16 +772,10 @@ export default function Products() {
                   )}
                 </tbody>
               </table>
-
               <div className="add-movement-form">
                 <h4>تسجيل حركة جديدة</h4>
                 <div className="movement-grid">
-                  <input
-                    type="number"
-                    placeholder="الكمية (+/-)"
-                    value={movementQuantity}
-                    onChange={e => setMovementQuantity(toNumber(e.target.value))}
-                  />
+                  <input type="number" placeholder="الكمية (+/-)" value={movementQuantity} onChange={e => setMovementQuantity(toNumber(e.target.value))} />
                   <select value={movementReason} onChange={e => setMovementReason(e.target.value as MovementReason)}>
                     <option value="purchase">شراء</option>
                     <option value="sale">بيع</option>
@@ -870,6 +803,7 @@ export default function Products() {
         </div>
       )}
 
+      {/* Modal: فورم المنتج */}
       {showForm && (
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
           <div className="modal large-modal" onClick={e => e.stopPropagation()}>
@@ -890,13 +824,8 @@ export default function Products() {
               <button className={activeTab === 'movements' ? 'active' : ''} onClick={() => setActiveTab('movements')} type="button">الحركات</button>
             </div>
 
-            <form
-              className="product-form"
-              onSubmit={e => {
-                e.preventDefault();
-                handleSubmit();
-              }}
-            >
+            <form className="product-form" onSubmit={e => { e.preventDefault(); handleSubmit(); }}>
+
               {activeTab === 'basic' && (
                 <div className="form-section">
                   <div className="form-grid-2">
@@ -911,11 +840,21 @@ export default function Products() {
                   </div>
 
                   <div className="form-grid-2">
+                    {/* ← جديد: حقل الباركود مع زر مسح */}
                     <div className="form-row">
                       <label>الباركود</label>
                       <div className="input-with-button">
-                        <input value={form.barcode} onChange={e => setForm({ ...form, barcode: e.target.value })} placeholder="يمكن إدخاله يدويًا أو توليده" />
-                        <button type="button" onClick={() => setForm({ ...form, barcode: generateEAN13() })}>توليد</button>
+                        <input
+                          value={form.barcode}
+                          onChange={e => setForm({ ...form, barcode: e.target.value })}
+                          placeholder="يمكن إدخاله يدويًا أو مسحه"
+                        />
+                        <button type="button" onClick={() => setShowScanner(true)} className="btn-scan">
+                          📷 مسح
+                        </button>
+                        <button type="button" onClick={() => setForm({ ...form, barcode: generateEAN13() })}>
+                          توليد
+                        </button>
                       </div>
                     </div>
                     <div className="form-row">
@@ -969,17 +908,12 @@ export default function Products() {
                       <label>إضافة صورة من رابط</label>
                       <div className="input-with-button">
                         <input id="newImageUrl" type="url" placeholder="https://..." />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const input = document.getElementById('newImageUrl') as HTMLInputElement | null;
-                            if (!input) return;
-                            if (input.value.trim()) addImageFromUrl(input.value);
-                            input.value = '';
-                          }}
-                        >
-                          إضافة
-                        </button>
+                        <button type="button" onClick={() => {
+                          const input = document.getElementById('newImageUrl') as HTMLInputElement | null;
+                          if (!input) return;
+                          if (input.value.trim()) addImageFromUrl(input.value);
+                          input.value = '';
+                        }}>إضافة</button>
                       </div>
                     </div>
                     <div className="form-row">
@@ -987,7 +921,6 @@ export default function Products() {
                       <input type="file" multiple accept="image/*" onChange={onDropFileInput} />
                     </div>
                   </div>
-
                   <div className="images-grid">
                     {form.images.map((img, idx) => (
                       <div key={img.id} className="image-item">
@@ -1019,7 +952,6 @@ export default function Products() {
                       <input type="number" value={form.sale_price} onChange={e => setForm({ ...form, sale_price: toNumber(e.target.value) })} />
                     </div>
                   </div>
-
                   <div className="form-grid-2">
                     <div className="form-row">
                       <label>سعر التكلفة</label>
@@ -1030,7 +962,6 @@ export default function Products() {
                       <input type="number" value={form.tax_rate} onChange={e => setForm({ ...form, tax_rate: toNumber(e.target.value) })} />
                     </div>
                   </div>
-
                   <div className="form-grid-2">
                     <div className="form-row">
                       <label>بداية الخصم</label>
@@ -1056,7 +987,6 @@ export default function Products() {
                       <input type="number" value={form.minQuantity} onChange={e => setForm({ ...form, minQuantity: toNumber(e.target.value) })} />
                     </div>
                   </div>
-
                   <div className="form-grid-2">
                     <div className="form-row">
                       <label>الوزن (كجم)</label>
@@ -1070,7 +1000,6 @@ export default function Products() {
                       </select>
                     </div>
                   </div>
-
                   <div className="form-row">
                     <label>الصورة الرئيسية</label>
                     <input value={form.imageUrl} onChange={e => setForm({ ...form, imageUrl: e.target.value })} placeholder="رابط الصورة الأساسية إذا رغبت" />
@@ -1084,7 +1013,6 @@ export default function Products() {
                     <h4>المتغيرات</h4>
                     <button type="button" onClick={addVariant}>+ أضف متغير</button>
                   </div>
-
                   <div className="variants-list">
                     {form.variants.map((v, idx) => (
                       <div key={v.id} className="variant-item">
@@ -1098,7 +1026,6 @@ export default function Products() {
                             <input value={v.sku || ''} onChange={e => updateVariant(idx, 'sku', e.target.value)} />
                           </div>
                         </div>
-
                         <div className="form-grid-2">
                           <div className="form-row">
                             <label>السعر</label>
@@ -1109,7 +1036,6 @@ export default function Products() {
                             <input type="number" value={v.quantity} onChange={e => updateVariant(idx, 'quantity', toNumber(e.target.value))} />
                           </div>
                         </div>
-
                         <div className="attributes-box">
                           <div className="attributes-head">
                             <strong>السمات</strong>
@@ -1117,20 +1043,11 @@ export default function Products() {
                           </div>
                           {Object.entries(v.attributes).map(([key, value]) => (
                             <div className="attribute-row" key={key}>
-                              <input
-                                value={key}
-                                disabled
-                                className="attr-key"
-                              />
-                              <input
-                                value={value}
-                                onChange={e => updateVariantAttribute(idx, key, e.target.value)}
-                                placeholder="القيمة"
-                              />
+                              <input value={key} disabled className="attr-key" />
+                              <input value={value} onChange={e => updateVariantAttribute(idx, key, e.target.value)} placeholder="القيمة" />
                             </div>
                           ))}
                         </div>
-
                         <div className="variant-actions">
                           <button type="button" onClick={() => removeVariant(idx)}>حذف المتغير</button>
                         </div>
@@ -1145,12 +1062,7 @@ export default function Products() {
                 <div className="form-section">
                   <table className="movements-table inside-form">
                     <thead>
-                      <tr>
-                        <th>التاريخ</th>
-                        <th>التغيير</th>
-                        <th>السبب</th>
-                        <th>ملاحظة</th>
-                      </tr>
+                      <tr><th>التاريخ</th><th>التغيير</th><th>السبب</th><th>ملاحظة</th></tr>
                     </thead>
                     <tbody>
                       {form.stock_movements.map(m => (
@@ -1221,740 +1133,190 @@ export default function Products() {
           flex-wrap: wrap;
         }
 
-        .eyebrow {
-          margin: 0 0 6px;
-          color: var(--brand);
-          font-size: 12px;
-          font-weight: 700;
-          letter-spacing: .08em;
-          text-transform: uppercase;
-        }
+        .eyebrow { margin: 0 0 6px; color: var(--brand); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+        .page-title { margin: 0; font-size: 30px; line-height: 1.2; }
+        .subtitle { margin: 8px 0 0; color: var(--muted); max-width: 760px; line-height: 1.7; }
 
-        .page-title {
-          margin: 0;
-          font-size: 30px;
-          line-height: 1.2;
-        }
-
-        .subtitle {
-          margin: 8px 0 0;
-          color: var(--muted);
-          max-width: 760px;
-          line-height: 1.7;
-        }
-
-        .hero-actions {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-          align-items: center;
-        }
+        .hero-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
         .btn-add, .mode-toggle, .view-toggle, .btn-save, .btn-cancel, .btn-secondary, .btn-ghost, .btn-danger, .btn-save-inline {
-          border: none;
-          border-radius: 14px;
-          padding: 11px 16px;
-          cursor: pointer;
-          font-weight: 700;
+          border: none; border-radius: 14px; padding: 11px 16px; cursor: pointer; font-weight: 700;
           transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
         }
 
-        .btn-add, .btn-save, .btn-save-inline {
-          background: linear-gradient(135deg, var(--brand), var(--brand-2));
-          color: #fff;
-        }
-
-        .btn-add:hover, .btn-save:hover, .btn-save-inline:hover, .btn-secondary:hover, .btn-ghost:hover, .btn-danger:hover, .mode-toggle:hover, .view-toggle:hover, .btn-cancel:hover {
-          transform: translateY(-1px);
-        }
+        .btn-add, .btn-save, .btn-save-inline { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff; }
+        .btn-add:hover, .btn-save:hover, .btn-save-inline:hover, .btn-secondary:hover, .btn-ghost:hover, .btn-danger:hover, .mode-toggle:hover, .view-toggle:hover, .btn-cancel:hover { transform: translateY(-1px); }
 
         .mode-toggle.simple { background: #eef2ff; color: var(--brand); }
         .mode-toggle.advanced { background: #f3e8ff; color: #6b21a8; }
         .view-toggle { background: #fff; border: 1px solid var(--line); color: var(--text); }
 
-        .stats-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-          gap: 12px;
-          margin-bottom: 18px;
-        }
-
-        .stat-card {
-          background: var(--card);
-          border-radius: 18px;
-          padding: 14px 16px;
-          border: 1px solid rgba(229,231,235,.9);
-        }
-
-        .stat-card span {
-          display: block;
-          color: var(--muted);
-          font-size: 13px;
-          margin-bottom: 8px;
-        }
-
-        .stat-card strong {
-          font-size: 24px;
-        }
-
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 18px; }
+        .stat-card { background: var(--card); border-radius: 18px; padding: 14px 16px; border: 1px solid rgba(229,231,235,.9); }
+        .stat-card span { display: block; color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+        .stat-card strong { font-size: 24px; }
         .stat-card.warning strong { color: var(--orange); }
 
         .filters-panel {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 10px;
-          align-items: center;
-          background: rgba(255,255,255,.9);
-          border: 1px solid rgba(229,231,235,.9);
-          border-radius: 20px;
-          padding: 14px;
-          margin-bottom: 18px;
-          backdrop-filter: blur(8px);
+          display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+          background: rgba(255,255,255,.9); border: 1px solid rgba(229,231,235,.9);
+          border-radius: 20px; padding: 14px; margin-bottom: 18px; backdrop-filter: blur(8px);
         }
 
-        .search-input, .filter-select, .form-row input, .form-row select, .form-row textarea, .add-movement-form input, .add-movement-form select, .input-with-button input, .input-with-button button, .attribute-row input, .variant-item input {
-          width: 100%;
-          border: 1px solid var(--line);
-          border-radius: 14px;
-          background: #fff;
-          padding: 11px 14px;
-          outline: none;
+        .search-input, .filter-select, .form-row input, .form-row select, .form-row textarea,
+        .add-movement-form input, .add-movement-form select, .input-with-button input,
+        .input-with-button button, .attribute-row input, .variant-item input {
+          width: 100%; border: 1px solid var(--line); border-radius: 14px;
+          background: #fff; padding: 11px 14px; outline: none;
           transition: border .15s ease, box-shadow .15s ease;
         }
 
-        .search-input:focus, .filter-select:focus, .form-row input:focus, .form-row select:focus, .form-row textarea:focus, .add-movement-form input:focus, .add-movement-form select:focus, .input-with-button input:focus, .attribute-row input:focus, .variant-item input:focus {
-          border-color: rgba(67,97,238,.8);
-          box-shadow: 0 0 0 4px rgba(67,97,238,.10);
+        .search-input:focus, .filter-select:focus, .form-row input:focus, .form-row select:focus,
+        .form-row textarea:focus, .add-movement-form input:focus, .add-movement-form select:focus,
+        .input-with-button input:focus, .attribute-row input:focus, .variant-item input:focus {
+          border-color: rgba(67,97,238,.8); box-shadow: 0 0 0 4px rgba(67,97,238,.10);
         }
 
         .search-input { flex: 1 1 320px; }
         .filter-select { flex: 0 1 180px; }
-        .filter-low-btn {
-          border: 1px solid var(--line);
-          background: #fff;
-          border-radius: 14px;
-          padding: 11px 14px;
-          cursor: pointer;
-          font-weight: 700;
-        }
-        .filter-low-btn.active {
-          background: #fff7ed;
-          border-color: #fdba74;
-          color: #b45309;
-        }
 
-        .loading-box, .empty-state {
-          background: var(--card);
-          border-radius: 22px;
-          padding: 42px 20px;
-          text-align: center;
-          border: 1px solid rgba(229,231,235,.9);
-        }
+        .filter-low-btn { border: 1px solid var(--line); background: #fff; border-radius: 14px; padding: 11px 14px; cursor: pointer; font-weight: 700; }
+        .filter-low-btn.active { background: #fff7ed; border-color: #fdba74; color: #b45309; }
+
+        .loading-box, .empty-state { background: var(--card); border-radius: 22px; padding: 42px 20px; text-align: center; border: 1px solid rgba(229,231,235,.9); }
         .empty-icon { font-size: 44px; margin-bottom: 10px; }
         .empty-state h3 { margin: 0 0 8px; }
         .empty-state p { margin: 0; color: var(--muted); }
 
-        .products-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-          gap: 16px;
-        }
+        .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
 
-        .product-card {
-          background: var(--card);
-          border-radius: 22px;
-          overflow: hidden;
-          border: 1px solid rgba(229,231,235,.9);
-          display: flex;
-          flex-direction: column;
-          min-height: 100%;
-        }
-
+        .product-card { background: var(--card); border-radius: 22px; overflow: hidden; border: 1px solid rgba(229,231,235,.9); display: flex; flex-direction: column; min-height: 100%; }
         .product-card.low { border-color: rgba(245,158,11,.45); }
         .product-card.inactive { opacity: .78; }
 
-        .card-media {
-          position: relative;
-          height: 210px;
-          background: linear-gradient(135deg, #eef2ff, #f8fafc);
-          overflow: hidden;
-        }
+        .card-media { position: relative; height: 210px; background: linear-gradient(135deg, #eef2ff, #f8fafc); overflow: hidden; }
+        .card-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .no-image { width: 100%; height: 100%; display: grid; place-items: center; font-size: 38px; color: #64748b; font-weight: 800; letter-spacing: .05em; }
 
-        .card-media img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-        }
+        .media-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; padding: 12px; background: linear-gradient(180deg, rgba(2,6,23,.04), rgba(2,6,23,.30)); pointer-events: none; }
 
-        .no-image {
-          width: 100%;
-          height: 100%;
-          display: grid;
-          place-items: center;
-          font-size: 38px;
-          color: #64748b;
-          font-weight: 800;
-          letter-spacing: .05em;
-        }
+        .overlay-badge, .pill, .primary-badge { display: inline-flex; align-items: center; width: fit-content; border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 700; }
+        .overlay-badge { color: #fff; background: rgba(15,23,42,.55); backdrop-filter: blur(6px); }
 
-        .media-overlay {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          padding: 12px;
-          background: linear-gradient(180deg, rgba(2,6,23,.04), rgba(2,6,23,.30));
-          pointer-events: none;
-        }
+        .quick-actions { display: flex; justify-content: flex-end; gap: 8px; pointer-events: auto; }
+        .quick-actions button { border: none; width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,.92); cursor: pointer; box-shadow: 0 8px 20px rgba(15,23,42,.14); }
 
-        .overlay-badge, .pill, .primary-badge {
-          display: inline-flex;
-          align-items: center;
-          width: fit-content;
-          border-radius: 999px;
-          padding: 6px 10px;
-          font-size: 12px;
-          font-weight: 700;
-        }
-
-        .overlay-badge {
-          color: #fff;
-          background: rgba(15, 23, 42, .55);
-          backdrop-filter: blur(6px);
-        }
-
-        .quick-actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 8px;
-          pointer-events: auto;
-        }
-
-        .quick-actions button {
-          border: none;
-          width: 40px;
-          height: 40px;
-          border-radius: 12px;
-          background: rgba(255,255,255,.92);
-          cursor: pointer;
-          box-shadow: 0 8px 20px rgba(15,23,42,.14);
-        }
-
-        .card-body {
-          padding: 14px 14px 12px;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          flex: 1;
-        }
-
-        .product-badges {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-
+        .card-body { padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+        .product-badges { display: flex; gap: 8px; flex-wrap: wrap; }
         .pill-green { background: #dcfce7; color: #166534; }
         .pill-orange { background: #ffedd5; color: #9a3412; }
         .pill-red { background: #fee2e2; color: #991b1b; }
         .pill-gray { background: #e5e7eb; color: #374151; }
 
-        .card-body h3 {
-          margin: 0;
-          font-size: 18px;
-          line-height: 1.35;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
+        .card-body h3 { margin: 0; font-size: 18px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .card-subtitle, .muted { margin: 0; color: var(--muted); font-size: 13px; }
 
-        .card-subtitle, .muted {
-          margin: 0;
-          color: var(--muted);
-          font-size: 13px;
-        }
+        .price-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .sale-price { color: #dc2626; font-size: 18px; }
+        .old-price { color: var(--muted); text-decoration: line-through; font-size: 13px; }
 
-        .price-row {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
+        .meta-grid, .extra-lines { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+        .meta-grid div, .extra-lines div { background: #f8fafc; border: 1px solid #eef2f7; border-radius: 14px; padding: 10px; }
+        .meta-grid span, .extra-lines span { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+        .meta-grid strong, .extra-lines strong { display: block; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-        .sale-price {
-          color: #dc2626;
-          font-size: 18px;
-        }
+        .card-footer { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 10px; }
 
-        .old-price {
-          color: var(--muted);
-          text-decoration: line-through;
-          font-size: 13px;
-        }
+        .qty-control, .quantity-control { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .qty-control button, .quantity-control button { width: 34px; height: 34px; border-radius: 12px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-size: 18px; }
 
-        .meta-grid, .extra-lines {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 10px;
-        }
-
-        .meta-grid div, .extra-lines div {
-          background: #f8fafc;
-          border: 1px solid #eef2f7;
-          border-radius: 14px;
-          padding: 10px;
-        }
-
-        .meta-grid span, .extra-lines span {
-          display: block;
-          color: var(--muted);
-          font-size: 12px;
-          margin-bottom: 4px;
-        }
-
-        .meta-grid strong, .extra-lines strong {
-          display: block;
-          font-size: 14px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-
-        .card-footer {
-          padding: 0 14px 14px;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-
-        .qty-control, .quantity-control {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-        }
-
-        .qty-control button, .quantity-control button {
-          width: 34px;
-          height: 34px;
-          border-radius: 12px;
-          border: 1px solid var(--line);
-          background: #fff;
-          cursor: pointer;
-          font-size: 18px;
-        }
-
-        .qty-badge {
-          min-width: 64px;
-          text-align: center;
-          padding: 7px 10px;
-          border-radius: 999px;
-          font-weight: 800;
-        }
-
+        .qty-badge { min-width: 64px; text-align: center; padding: 7px 10px; border-radius: 999px; font-weight: 800; }
         .qty-ok { background: #dcfce7; color: #166534; }
         .qty-low { background: #fee2e2; color: #991b1b; }
 
-        .action-row, .action-btns {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-
-        .btn-secondary, .btn-ghost, .btn-danger, .btn-edit, .btn-log, .btn-delete {
-          padding: 9px 12px;
-          border-radius: 12px;
-          font-size: 13px;
-          font-weight: 700;
-        }
+        .action-row, .action-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn-secondary, .btn-ghost, .btn-danger, .btn-edit, .btn-log, .btn-delete { padding: 9px 12px; border-radius: 12px; font-size: 13px; font-weight: 700; }
         .btn-secondary, .btn-edit { background: #eef2ff; color: var(--brand); }
         .btn-ghost, .btn-log { background: #f8fafc; color: #334155; }
         .btn-danger, .btn-delete { background: #fff1f2; color: #be123c; }
         .btn-edit, .btn-log, .btn-delete { border: none; }
 
-        .table-shell {
-          background: var(--card);
-          border-radius: 22px;
-          overflow: auto;
-          border: 1px solid rgba(229,231,235,.9);
-        }
+        .table-shell { background: var(--card); border-radius: 22px; overflow: auto; border: 1px solid rgba(229,231,235,.9); }
+        .products-table { width: 100%; border-collapse: collapse; min-width: 980px; }
+        .products-table th, .products-table td { padding: 14px 16px; text-align: right; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .products-table th { background: #f8fafc; color: #334155; font-size: 13px; white-space: nowrap; }
+        .row-low-stock td { background: #fffbeb; }
 
-        .products-table {
-          width: 100%;
-          border-collapse: collapse;
-          min-width: 980px;
-        }
-        .products-table th, .products-table td {
-          padding: 14px 16px;
-          text-align: right;
-          border-bottom: 1px solid #f1f5f9;
-          vertical-align: middle;
-        }
-        .products-table th {
-          background: #f8fafc;
-          color: #334155;
-          font-size: 13px;
-          white-space: nowrap;
-        }
-        .row-low-stock td {
-          background: #fffbeb;
-        }
+        .product-name-cell { display: flex; align-items: center; gap: 12px; }
+        .product-thumb { width: 50px; height: 50px; border-radius: 14px; object-fit: cover; flex-shrink: 0; }
+        .thumb-fallback { width: 50px; height: 50px; border-radius: 14px; background: #e2e8f0; display: grid; place-items: center; font-weight: 800; color: #475569; flex-shrink: 0; }
+        .price-compact { display: flex; flex-direction: column; gap: 2px; }
 
-        .product-name-cell {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
+        .sticky { position: sticky; top: 0; z-index: 2; background: #fff; }
 
-        .product-thumb {
-          width: 50px;
-          height: 50px;
-          border-radius: 14px;
-          object-fit: cover;
-          flex-shrink: 0;
-        }
-
-        .thumb-fallback {
-          width: 50px;
-          height: 50px;
-          border-radius: 14px;
-          background: #e2e8f0;
-          display: grid;
-          place-items: center;
-          font-weight: 800;
-          color: #475569;
-          flex-shrink: 0;
-        }
-
-        .price-compact {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-
-        .sticky {
-          position: sticky;
-          top: 0;
-          z-index: 2;
-          background: #fff;
-        }
-
-        .modal-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(15, 23, 42, .56);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 16px;
-          z-index: 1000;
-          backdrop-filter: blur(3px);
-        }
-
-        .modal {
-          width: min(1180px, 100%);
-          max-height: 92vh;
-          overflow: auto;
-          background: #fff;
-          border-radius: 26px;
-          border: 1px solid rgba(229,231,235,.9);
-        }
-
+        .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.56); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 1000; backdrop-filter: blur(3px); }
+        .modal { width: min(1180px, 100%); max-height: 92vh; overflow: auto; background: #fff; border-radius: 26px; border: 1px solid rgba(229,231,235,.9); }
         .large-modal { width: min(1240px, 100%); }
 
-        .modal-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          padding: 18px 22px;
-          border-bottom: 1px solid #eef2f7;
-        }
+        .modal-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 22px; border-bottom: 1px solid #eef2f7; }
+        .modal-kicker { margin: 0 0 4px; color: var(--brand); font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+        .modal-header h2 { margin: 0; font-size: 22px; }
+        .modal-close { width: 42px; height: 42px; border-radius: 14px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-size: 18px; }
 
-        .modal-kicker {
-          margin: 0 0 4px;
-          color: var(--brand);
-          font-size: 12px;
-          font-weight: 800;
-          letter-spacing: .06em;
-          text-transform: uppercase;
-        }
+        .modal-body { padding: 20px 22px; }
 
-        .modal-header h2 {
-          margin: 0;
-          font-size: 22px;
-        }
+        .modal-tabs { display: flex; gap: 8px; padding: 0 22px; border-bottom: 1px solid #eef2f7; overflow-x: auto; }
+        .modal-tabs button { border: none; background: transparent; cursor: pointer; padding: 14px 6px; white-space: nowrap; color: var(--muted); font-weight: 700; border-bottom: 2px solid transparent; }
+        .modal-tabs button.active { color: var(--brand); border-bottom-color: var(--brand); }
 
-        .modal-close {
-          width: 42px;
-          height: 42px;
-          border-radius: 14px;
-          border: 1px solid var(--line);
-          background: #fff;
-          cursor: pointer;
-          font-size: 18px;
-        }
+        .product-form { padding: 20px 22px 22px; }
+        .form-section { display: flex; flex-direction: column; gap: 16px; }
+        .form-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+        .form-row { display: flex; flex-direction: column; gap: 7px; }
+        .form-row label { font-weight: 700; color: #334155; font-size: 14px; }
+        .form-row textarea { resize: vertical; min-height: 110px; }
 
-        .modal-tabs {
-          display: flex;
-          gap: 8px;
-          padding: 0 22px;
-          border-bottom: 1px solid #eef2f7;
-          overflow-x: auto;
-        }
+        .form-row-checkbox label { display: flex; align-items: center; gap: 10px; margin-top: 30px; background: #f8fafc; border: 1px solid #eef2f7; padding: 13px 14px; border-radius: 14px; }
 
-        .modal-tabs button {
-          border: none;
-          background: transparent;
-          cursor: pointer;
-          padding: 14px 6px;
-          white-space: nowrap;
-          color: var(--muted);
-          font-weight: 700;
-          border-bottom: 2px solid transparent;
-        }
-
-        .modal-tabs button.active {
-          color: var(--brand);
-          border-bottom-color: var(--brand);
-        }
-
-        .product-form {
-          padding: 20px 22px 22px;
-        }
-
-        .form-section {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        .form-grid-2 {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 14px;
-        }
-
-        .form-row {
-          display: flex;
-          flex-direction: column;
-          gap: 7px;
-        }
-
-        .form-row label {
-          font-weight: 700;
-          color: #334155;
-          font-size: 14px;
-        }
-
-        .form-row textarea {
-          resize: vertical;
-          min-height: 110px;
-        }
-
-        .form-row-checkbox label {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          margin-top: 30px;
-          background: #f8fafc;
-          border: 1px solid #eef2f7;
-          padding: 13px 14px;
-          border-radius: 14px;
-        }
-
-        .input-with-button {
-          display: flex;
-          gap: 8px;
-        }
-
+        .input-with-button { display: flex; gap: 8px; }
         .input-with-button input { flex: 1; }
-        .input-with-button button {
-          width: auto;
-          padding-inline: 16px;
-          background: #eef2ff;
-          color: var(--brand);
-          font-weight: 800;
-          cursor: pointer;
-        }
+        .input-with-button button { width: auto; padding-inline: 16px; background: #eef2ff; color: var(--brand); font-weight: 800; cursor: pointer; }
 
-        .images-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-          gap: 14px;
-        }
+        /* ← جديد: زر المسح */
+        .btn-scan { background: linear-gradient(135deg, var(--brand), var(--brand-2)) !important; color: #fff !important; }
 
-        .image-item {
-          border: 1px solid var(--line);
-          border-radius: 18px;
-          background: #fff;
-          overflow: hidden;
-        }
+        .images-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; }
+        .image-item { border: 1px solid var(--line); border-radius: 18px; background: #fff; overflow: hidden; }
+        .image-wrap { position: relative; height: 140px; background: #f8fafc; }
+        .image-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .primary-badge { position: absolute; top: 10px; right: 10px; background: rgba(245,158,11,.95); color: #fff; }
+        .image-actions { display: flex; gap: 8px; padding: 10px; justify-content: center; flex-wrap: wrap; }
+        .image-actions button { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+        .image-actions button.active { background: #fbbf24; border-color: #f59e0b; }
 
-        .image-wrap {
-          position: relative;
-          height: 140px;
-          background: #f8fafc;
-        }
+        .section-head, .attributes-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .section-head h4, .attributes-head strong { margin: 0; font-size: 16px; }
+        .section-head button, .attributes-head button, .variant-actions button { border: none; background: #eef2ff; color: var(--brand); border-radius: 12px; padding: 10px 14px; font-weight: 800; cursor: pointer; }
 
-        .image-wrap img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-        }
+        .variant-item { border: 1px solid var(--line); border-radius: 18px; padding: 14px; background: #fff; display: flex; flex-direction: column; gap: 12px; }
+        .attributes-box { border-radius: 16px; background: #f8fafc; border: 1px solid #eef2f7; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+        .attribute-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .attr-key { background: #eef2f7; color: #475569; }
+        .variant-actions { display: flex; justify-content: flex-start; }
+        .variants-list { display: flex; flex-direction: column; gap: 12px; }
+        .muted-box { margin: 0; padding: 16px; border-radius: 16px; background: #f8fafc; color: var(--muted); border: 1px dashed #dbe2ea; }
 
-        .primary-badge {
-          position: absolute;
-          top: 10px;
-          right: 10px;
-          background: rgba(245, 158, 11, .95);
-          color: #fff;
-        }
-
-        .image-actions {
-          display: flex;
-          gap: 8px;
-          padding: 10px;
-          justify-content: center;
-          flex-wrap: wrap;
-        }
-
-        .image-actions button {
-          width: 34px;
-          height: 34px;
-          border-radius: 10px;
-          border: 1px solid var(--line);
-          background: #fff;
-          cursor: pointer;
-        }
-
-        .image-actions button.active {
-          background: #fbbf24;
-          border-color: #f59e0b;
-        }
-
-        .section-head, .attributes-head {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-        }
-
-        .section-head h4, .attributes-head strong {
-          margin: 0;
-          font-size: 16px;
-        }
-
-        .section-head button, .attributes-head button, .variant-actions button {
-          border: none;
-          background: #eef2ff;
-          color: var(--brand);
-          border-radius: 12px;
-          padding: 10px 14px;
-          font-weight: 800;
-          cursor: pointer;
-        }
-
-        .variant-item {
-          border: 1px solid var(--line);
-          border-radius: 18px;
-          padding: 14px;
-          background: #fff;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .attributes-box {
-          border-radius: 16px;
-          background: #f8fafc;
-          border: 1px solid #eef2f7;
-          padding: 12px;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-
-        .attribute-row {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-        }
-
-        .attr-key {
-          background: #eef2f7;
-          color: #475569;
-        }
-
-        .variant-actions {
-          display: flex;
-          justify-content: flex-start;
-        }
-
-        .variants-list {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .muted-box {
-          margin: 0;
-          padding: 16px;
-          border-radius: 16px;
-          background: #f8fafc;
-          color: var(--muted);
-          border: 1px dashed #dbe2ea;
-        }
-
-        .movements-table {
-          width: 100%;
-          border-collapse: collapse;
-          background: #fff;
-          border: 1px solid var(--line);
-          border-radius: 18px;
-          overflow: hidden;
-        }
-        .movements-table th, .movements-table td {
-          padding: 10px 12px;
-          border-bottom: 1px solid #eef2f7;
-          text-align: right;
-        }
+        .movements-table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+        .movements-table th, .movements-table td { padding: 10px 12px; border-bottom: 1px solid #eef2f7; text-align: right; }
         .movements-table th { background: #f8fafc; }
         .positive { color: var(--green); font-weight: 800; }
         .negative { color: var(--red); font-weight: 800; }
+        .inside-form { border-radius: 18px; overflow: hidden; }
 
-        .inside-form {
-          border-radius: 18px;
-          overflow: hidden;
-        }
+        .add-movement-form { margin-top: 16px; padding-top: 16px; border-top: 1px solid #eef2f7; display: flex; flex-direction: column; gap: 12px; }
+        .movement-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 
-        .add-movement-form {
-          margin-top: 16px;
-          padding-top: 16px;
-          border-top: 1px solid #eef2f7;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .movement-grid {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 10px;
-        }
-
-        .form-actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 10px;
-          margin-top: 22px;
-          padding-top: 18px;
-          border-top: 1px solid #eef2f7;
-        }
-
+        .form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; padding-top: 18px; border-top: 1px solid #eef2f7; }
         .btn-cancel { background: #fff; border: 1px solid var(--line); color: var(--text); }
         .btn-save:disabled { opacity: .65; cursor: not-allowed; }
 
