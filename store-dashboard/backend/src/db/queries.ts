@@ -11,11 +11,30 @@ export async function getProducts(storeId: string): Promise<Product[]> {
   return result.rows.map(mapProduct);
 }
 
-export async function addProduct(data: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> {
+export async function addProduct(data: any): Promise<Product> {
   const result = await pool.query(
-    `INSERT INTO products (store_id, name, price, quantity, category, min_quantity, image_url)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-    [data.storeId, data.name, data.price, data.quantity, data.category, data.minQuantity, data.imageUrl || null]
+    `INSERT INTO products 
+    (store_id, name, price, quantity, category, min_quantity, image_url,
+     sku, barcode, cost_price, discount_type, discount_value, tags, status)
+    VALUES 
+    ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+    RETURNING *`,
+    [
+      data.storeId,
+      data.name,
+      data.price,
+      data.quantity,
+      data.category,
+      data.minQuantity,
+      data.imageUrl || null,
+      data.sku || null,
+      data.barcode || null,
+      data.costPrice || null,
+      data.discountType || null,
+      data.discountValue || null,
+      data.tags || null,
+      data.status || 'published'
+    ]
   );
   return mapProduct(result.rows[0]);
 }
@@ -30,6 +49,14 @@ export async function updateProduct(id: string, data: Partial<Product>): Promise
   if (data.quantity !== undefined) { fields.push(`quantity = $${idx++}`); values.push(data.quantity); }
   if (data.category !== undefined) { fields.push(`category = $${idx++}`); values.push(data.category); }
   if (data.minQuantity !== undefined) { fields.push(`min_quantity = $${idx++}`); values.push(data.minQuantity); }
+  if (data.imageUrl !== undefined) { fields.push(`image_url = $${idx++}`); values.push(data.imageUrl); }
+  if (data.sku !== undefined) { fields.push(`sku = $${idx++}`); values.push(data.sku); }
+  if (data.barcode !== undefined) { fields.push(`barcode = $${idx++}`); values.push(data.barcode); }
+  if (data.costPrice !== undefined) { fields.push(`cost_price = $${idx++}`); values.push(data.costPrice); }
+  if (data.discountType !== undefined) { fields.push(`discount_type = $${idx++}`); values.push(data.discountType); }
+  if (data.discountValue !== undefined) { fields.push(`discount_value = $${idx++}`); values.push(data.discountValue); }
+  if (data.tags !== undefined) { fields.push(`tags = $${idx++}`); values.push(data.tags); }
+  if (data.status !== undefined) { fields.push(`status = $${idx++}`); values.push(data.status); }
 
   if (fields.length === 0) return null;
 
@@ -137,15 +164,16 @@ export async function getStats(storeId: string) {
     pool.query('SELECT COUNT(*), COALESCE(SUM(total_price), 0) as revenue FROM orders WHERE store_id = $1 AND created_at >= $2', [storeId, today]),
     pool.query('SELECT COUNT(*) FROM orders WHERE store_id = $1', [storeId]),
     pool.query('SELECT * FROM products WHERE store_id = $1 AND quantity <= min_quantity ORDER BY quantity ASC', [storeId]),
-    pool.query(`
-      SELECT p.*, COALESCE(SUM(oi.quantity), 0) as sold_count
+    pool.query(
+      `SELECT p.*, COALESCE(SUM(oi.quantity), 0) as sold_count
       FROM products p
       LEFT JOIN order_items oi ON p.id = oi.product_id
       WHERE p.store_id = $1
       GROUP BY p.id
       ORDER BY sold_count DESC
-      LIMIT 5
-    `, [storeId])
+      LIMIT 5`,
+      [storeId]
+    )
   ]);
 
   return {
@@ -197,6 +225,13 @@ function mapProduct(row: any): Product {
     category: row.category,
     minQuantity: row.min_quantity,
     imageUrl: row.image_url,
+    sku: row.sku,
+    barcode: row.barcode,
+    costPrice: row.cost_price ? parseFloat(row.cost_price) : null,
+    discountType: row.discount_type,
+    discountValue: row.discount_value ? parseFloat(row.discount_value) : null,
+    tags: row.tags,
+    status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
