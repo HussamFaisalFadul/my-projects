@@ -249,6 +249,68 @@ export async function deleteProduct(id: string): Promise<boolean> {
   return (result.rowCount ?? 0) > 0;
 }
 
+// ===== دوال إضافية للصور والمتغيرات (متوافقة مع الجداول الحالية) =====
+
+export async function addProductImage(
+  productId: string,
+  url: string,
+  isPrimary: boolean = false,
+  sortOrder: number = 0
+) {
+  const result = await pool.query(
+    `INSERT INTO product_images (product_id, url, is_primary, sort_order)
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [productId, url, isPrimary, sortOrder]
+  );
+  return result.rows[0];
+}
+
+export async function getProductImages(productId: string) {
+  const result = await pool.query(
+    `SELECT * FROM product_images 
+     WHERE product_id = $1 
+     ORDER BY sort_order ASC`,
+    [productId]
+  );
+  return result.rows;
+}
+
+export async function deleteProductImage(imageId: string) {
+  await pool.query('DELETE FROM product_images WHERE id = $1', [imageId]);
+}
+
+export async function addProductVariant(
+  productId: string,
+  title: string,
+  attributes: Record<string, string> = {},
+  price: number = 0,
+  costPrice: number = 0,
+  quantity: number = 0,
+  sku?: string,
+  imageUrl?: string,
+  isActive: boolean = true,
+  sortOrder: number = 0
+) {
+  const result = await pool.query(
+    `INSERT INTO product_variants (product_id, title, attributes, price, cost_price, quantity, sku, image_url, is_active, sort_order)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+    [productId, title, JSON.stringify(attributes), price, costPrice, quantity, sku || null, imageUrl || null, isActive, sortOrder]
+  );
+  return result.rows[0];
+}
+
+export async function getProductVariants(productId: string) {
+  const result = await pool.query(
+    `SELECT * FROM product_variants WHERE product_id = $1 ORDER BY sort_order ASC`,
+    [productId]
+  );
+  return result.rows;
+}
+
+export async function deleteProductVariant(variantId: string) {
+  await pool.query('DELETE FROM product_variants WHERE id = $1', [variantId]);
+}
+
 // ===== حركة المخزون =====
 
 export async function addStockMovement(data: {
