@@ -18,9 +18,15 @@ import {
   getStats,
   getNotifications,
   addNotification,
-  getStockMovements,       // جديد
-  addStockMovement,       // جديد
-  getProductById,         // جديد
+  getStockMovements,
+  addStockMovement,
+  getProductById,
+  addProductImage,
+  getProductImages,
+  deleteProductImage,
+  addProductVariant,
+  getProductVariants,
+  deleteProductVariant,
 } from './db/queries';
 import { getMemberRole } from './stores/queries';
 import { analyzeInventory, generateDailyReport } from './ai';
@@ -94,7 +100,55 @@ app.delete('/api/products/:id', authMiddleware, requireStore, async (req: any, r
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
-// ===== مسارات حركات المخزون (جديد) =====
+// ===== صور المنتج (مسارات جديدة) =====
+app.post('/api/products/:id/images', authMiddleware, requireStore, async (req: any, res) => {
+  try {
+    const { url, isPrimary, sortOrder } = req.body;
+    const image = await addProductImage(req.params.id, url, isPrimary, sortOrder);
+    res.json(image);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/products/:id/images', authMiddleware, requireStore, async (req: any, res) => {
+  try {
+    const images = await getProductImages(req.params.id);
+    res.json(images);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/products/:id/images/:imageId', authMiddleware, requireStore, async (req: any, res) => {
+  try {
+    await deleteProductImage(req.params.imageId);
+    res.json({ success: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ===== متغيرات المنتج (مسارات جديدة) =====
+app.post('/api/products/:id/variants', authMiddleware, requireStore, async (req: any, res) => {
+  try {
+    const { title, attributes, price, costPrice, quantity, sku, imageUrl, isActive, sortOrder } = req.body;
+    const variant = await addProductVariant(
+      req.params.id, title, attributes, price, costPrice, quantity, sku, imageUrl, isActive, sortOrder
+    );
+    res.json(variant);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/products/:id/variants', authMiddleware, requireStore, async (req: any, res) => {
+  try {
+    const variants = await getProductVariants(req.params.id);
+    res.json(variants);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/products/:id/variants/:variantId', authMiddleware, requireStore, async (req: any, res) => {
+  try {
+    await deleteProductVariant(req.params.variantId);
+    res.json({ success: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ===== مسارات حركات المخزون =====
 app.get('/api/products/:id/movements', authMiddleware, requireStore, async (req: any, res) => {
   try {
     const movements = await getStockMovements(req.params.id);
@@ -116,7 +170,6 @@ app.post('/api/products/:id/movements', authMiddleware, requireStore, async (req
       createdBy: req.user.id,
     });
 
-    // إعلام عبر WebSocket
     const product = await getProductById(req.params.id);
     if (product) {
       io.to(req.storeId).emit('product_updated', product);
