@@ -29,7 +29,7 @@ interface Variant {
   image_url?: string;
 }
 
-interface ExtendedProduct extends ApiProduct {
+interface ExtendedProduct {
   images?: ProductImage[];
   stock_movements?: StockMovement[];
   variants?: Variant[];
