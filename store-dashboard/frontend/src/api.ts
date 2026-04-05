@@ -9,6 +9,14 @@ export interface Product {
   category: string;
   minQuantity: number;
   imageUrl?: string;
+  // 🔥 الحقول الجديدة (متطابقة مع الخلفية)
+  sku?: string;
+  barcode?: string;
+  costPrice?: number;
+  discountType?: string;
+  discountValue?: number;
+  tags?: string[];        // مصفوفة نصوص
+  status?: string;        // 'published', 'draft', إلخ
   createdAt: string;
   updatedAt: string;
 }
@@ -70,49 +78,49 @@ export const socket: Socket = io(BACKEND_URL, {
 });
 
 export const api = {
-  getProducts: () =>
+  getProducts: (): Promise<Product[]> =>
     fetch(`${BACKEND_URL}/api/products`, { headers: authHeaders() }).then(r => r.json()),
 
-  getOrders: () =>
+  getOrders: (): Promise<Order[]> =>
     fetch(`${BACKEND_URL}/api/orders`, { headers: authHeaders() }).then(r => r.json()),
 
-  getStats: () =>
+  getStats: (): Promise<StoreStats> =>
     fetch(`${BACKEND_URL}/api/stats`, { headers: authHeaders() }).then(r => r.json()),
 
-  getNotifications: () =>
+  getNotifications: (): Promise<Notification[]> =>
     fetch(`${BACKEND_URL}/api/notifications`, { headers: authHeaders() }).then(r => r.json()),
 
-  getReport: () =>
+  getReport: (): Promise<{ report: string }> =>
     fetch(`${BACKEND_URL}/api/report`, { headers: authHeaders() }).then(r => r.json()),
 
-  addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) =>
+  addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> =>
     fetch(`${BACKEND_URL}/api/products`, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify(product),
     }).then(r => r.json()),
 
-  updateProduct: (id: string, data: Partial<Product>) =>
+  updateProduct: (id: string, data: Partial<Product>): Promise<Product> =>
     fetch(`${BACKEND_URL}/api/products/${id}`, {
       method: 'PUT',
       headers: authHeaders(),
       body: JSON.stringify(data),
     }).then(r => r.json()),
 
-  deleteProduct: (id: string) =>
+  deleteProduct: (id: string): Promise<{ success: boolean }> =>
     fetch(`${BACKEND_URL}/api/products/${id}`, {
       method: 'DELETE',
       headers: authHeaders(),
     }).then(r => r.json()),
 
-  addOrder: (order: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>) =>
+  addOrder: (order: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>): Promise<Order> =>
     fetch(`${BACKEND_URL}/api/orders`, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify(order),
     }).then(r => r.json()),
 
-  updateOrderStatus: (id: string, status: Order['status']) =>
+  updateOrderStatus: (id: string, status: Order['status']): Promise<Order> =>
     fetch(`${BACKEND_URL}/api/orders/${id}/status`, {
       method: 'PUT',
       headers: authHeaders(),
@@ -120,10 +128,10 @@ export const api = {
     }).then(r => r.json()),
 
   // ===== المتاجر =====
-  getMyStores: () =>
+  getMyStores: (): Promise<any[]> =>
     fetch(`${BACKEND_URL}/stores`, { headers: authHeaders() }).then(r => r.json()),
 
-  createStore: (data: { name: string; description?: string }) =>
+  createStore: (data: { name: string; description?: string }): Promise<any> =>
     fetch(`${BACKEND_URL}/stores`, {
       method: 'POST',
       headers: authHeaders(),
