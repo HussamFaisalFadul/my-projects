@@ -47,6 +47,14 @@ export interface Product {
   category: string;
   minQuantity: number;
   imageUrl?: string;
+  // الحقول الجديدة
+  sku?: string;
+  barcode?: string;
+  costPrice?: number;
+  discountType?: string;
+  discountValue?: number;
+  tags?: string;
+  status?: string;
   createdAt: Date;
   updatedAt: Date;
 }
