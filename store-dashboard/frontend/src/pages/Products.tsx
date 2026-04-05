@@ -29,10 +29,11 @@ interface Variant {
   image_url?: string;
 }
 
-interface ExtendedProduct {
+type ExtendedProduct = Omit<ApiProduct, 'variants' | 'stockMovements'> & {
+  // خصائص إضافية محلية (تخزن في localStorage)
   images?: ProductImage[];
-  stock_movements?: StockMovement[];
   variants?: Variant[];
+  stock_movements?: StockMovement[];
   brand?: string;
   weight_kg?: number;
   tax_rate?: number;
@@ -44,7 +45,7 @@ interface ExtendedProduct {
   unit?: string;
   is_active?: boolean;
   tagsText?: string;
-}
+};
 
 type ViewMode = 'grid' | 'table';
 type ProductsMode = 'simple' | 'advanced';
