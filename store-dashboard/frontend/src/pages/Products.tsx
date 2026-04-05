@@ -332,7 +332,7 @@ export default function Products() {
     setForm(prev => ({ ...prev, variants: prev.variants.filter((_, i) => i !== index) }));
   };
 
-  // ===== حفظ المنتج — صور وVariants في الـ DB =====
+  // ===== حفظ المنتج — مع تطابق الـ Types =====
   const handleSubmit = async () => {
     if (!form.name.trim() || form.price <= 0) return;
     setSaving(true);
@@ -340,6 +340,7 @@ export default function Products() {
       const finalImages = syncPrimaryImage(form.images)
         .map((img, idx) => ({ ...img, sort_order: idx }));
 
+      // ⭐ التعديل المطلوب: إرسال الصور والمتغيرات بالشكل الصحيح لـ api.ts
       const baseProduct = {
         name: form.name.trim(),
         price: form.price,
@@ -362,16 +363,23 @@ export default function Products() {
         isActive: form.is_active,
         tags: form.tagsText.split(',').map(t => t.trim()).filter(Boolean),
         status: form.is_active ? 'published' : 'draft',
-        // ← الصور والـ variants ترسل للـ DB مباشرة
+        // الصور حسب ProductImage في api.ts
         images: finalImages.map(img => ({
+          id: img.id,
+          productId: '',          // سيتم تعيينه من الخادم (يمكن تركه فارغاً)
           url: img.url,
           isPrimary: img.is_primary,
           sortOrder: img.sort_order,
+          createdAt: new Date().toISOString(),
         })),
+        // المتغيرات حسب ProductVariant في api.ts
         variants: form.variants.map((v, idx) => ({
+          id: v.id,
+          productId: '',
           title: v.title,
           attributes: v.attributes,
           price: v.price,
+          costPrice: 0,               // يمكنك تعيينه من v.cost_price إذا وجد
           quantity: v.quantity,
           sku: v.sku || undefined,
           imageUrl: v.image_url || undefined,
@@ -443,7 +451,6 @@ export default function Products() {
         quantityChange: change,
         note,
       });
-      // تحديث السجل
       const movements = await api.getStockMovements(productId);
       setMovementsData(movements);
       await fetchProducts();
@@ -521,7 +528,6 @@ export default function Products() {
 
   return (
     <div className="products-page" dir="rtl">
-
       {showScanner && (
         <BarcodeScanner
           onDetected={(code) => { setForm(prev => ({ ...prev, barcode: code })); setShowScanner(false); }}
@@ -815,7 +821,6 @@ export default function Products() {
             </div>
 
             <form className="product-form" onSubmit={e => { e.preventDefault(); handleSubmit(); }}>
-
               {/* تبويب الأساسيات */}
               {activeTab === 'basic' && (
                 <div className="form-section">
