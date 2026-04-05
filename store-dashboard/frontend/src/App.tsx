@@ -305,7 +305,7 @@ export default function App() {
 
       <main className="main">
         {page === 'dashboard' && <Dashboard stats={stats} notifications={notifications} orders={orders} products={products} />}
-        {page === 'products' && <Products products={products} />}
+        {page === 'products' && <Products {...{ products } as any} />}
         {page === 'orders' && <Orders orders={orders} products={products} />}
         {page === 'settings' && <Settings storeName={storeName} onStoreNameChange={(name) => { setStoreName(name); }} />}
       </main>
