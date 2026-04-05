@@ -29,24 +29,23 @@ interface Variant {
   image_url?: string;
 }
 
+// ✅ الحل: نمدد ApiProduct ولا نكرر الحقول الموجودة فيه
 interface ExtendedProduct extends ApiProduct {
+  // الحقول الإضافية التي ليست في ApiProduct (تخزن محلياً)
   images?: ProductImage[];
   stock_movements?: StockMovement[];
   variants?: Variant[];
-  barcode?: string;
   brand?: string;
   weight_kg?: number;
   tax_rate?: number;
   sale_price?: number;
   sale_start?: string;
   sale_end?: string;
-  sku?: string;
   description?: string;
   cost_price?: number;
   unit?: string;
   is_active?: boolean;
-  minQuantity?: number;
-  tags?: string[];
+  tagsText?: string;   // للنص المدخل في الفورم
 }
 
 type ViewMode = 'grid' | 'table';
@@ -150,8 +149,6 @@ export default function Products() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(clone(emptyForm));
   const [saving, setSaving] = useState(false);
-
-  // ← جديد: حالة الـ Scanner
   const [showScanner, setShowScanner] = useState(false);
 
   const [search, setSearch] = useState('');
@@ -169,7 +166,7 @@ export default function Products() {
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
-      const productsData = (await api.getProducts()) as ApiProduct[];
+      const productsData = await api.getProducts();
       const productsWithExtras = productsData.map(p => ({
         ...p,
         ...getProductExtras(p.id),
@@ -367,12 +364,20 @@ export default function Products() {
         minQuantity: form.minQuantity,
         imageUrl: form.images.find(img => img.is_primary)?.url || form.imageUrl || '',
         storeId: getStoreId(),
+        // الحقول الجديدة من ApiProduct
+        sku: form.sku || undefined,
+        barcode: form.barcode || undefined,
+        costPrice: form.cost_price || undefined,
+        discountType: undefined,
+        discountValue: undefined,
+        tags: form.tagsText.split(',').map(t => t.trim()).filter(Boolean),
+        status: form.is_active ? 'published' : 'draft',
       };
 
       let savedProduct: ApiProduct;
       if (editingId) {
         await api.updateProduct(editingId, baseProduct);
-        savedProduct = { id: editingId, ...baseProduct, createdAt: '', updatedAt: '' } as ApiProduct;
+        savedProduct = { id: editingId, ...baseProduct, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as ApiProduct;
       } else {
         savedProduct = await api.addProduct(baseProduct);
       }
@@ -381,19 +386,17 @@ export default function Products() {
         images: syncPrimaryImage(form.images).map((img, idx) => ({ ...img, sort_order: idx })),
         variants: form.variants,
         stock_movements: form.stock_movements,
-        barcode: form.barcode.trim(),
         brand: form.brand.trim(),
         weight_kg: form.weight_kg,
         tax_rate: form.tax_rate,
         sale_price: form.sale_price,
         sale_start: form.sale_start,
         sale_end: form.sale_end,
-        sku: form.sku.trim(),
         description: form.description,
         cost_price: form.cost_price,
         unit: form.unit,
         is_active: form.is_active,
-        tags: form.tagsText.split(',').map(t => t.trim()).filter(Boolean),
+        tags: baseProduct.tags,
       };
 
       setProductExtras(savedProduct.id, extras);
@@ -546,7 +549,6 @@ export default function Products() {
   return (
     <div className="products-page" dir="rtl">
 
-      {/* ← جديد: مكون الـ Scanner */}
       {showScanner && (
         <BarcodeScanner
           onDetected={(code) => setForm(prev => ({ ...prev, barcode: code }))}
@@ -840,7 +842,6 @@ export default function Products() {
                   </div>
 
                   <div className="form-grid-2">
-                    {/* ← جديد: حقل الباركود مع زر مسح */}
                     <div className="form-row">
                       <label>الباركود</label>
                       <div className="input-with-button">
@@ -1282,7 +1283,6 @@ export default function Products() {
         .input-with-button input { flex: 1; }
         .input-with-button button { width: auto; padding-inline: 16px; background: #eef2ff; color: var(--brand); font-weight: 800; cursor: pointer; }
 
-        /* ← جديد: زر المسح */
         .btn-scan { background: linear-gradient(135deg, var(--brand), var(--brand-2)) !important; color: #fff !important; }
 
         .images-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; }
