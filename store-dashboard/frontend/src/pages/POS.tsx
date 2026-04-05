@@ -483,7 +483,7 @@ export default function POS() {
               ['خصم المنتجات', `- ${cartDiscount.toFixed(2)} ر.س`],
               discountAmount > 0 ? ['خصم إضافي', `- ${discountAmount.toFixed(2)} ر.س`] : null,
               taxAmount > 0 ? [`ضريبة ${taxRate}%`, `+ ${taxAmount.toFixed(2)} ر.س`] : null,
-            ].filter(Boolean).map(([label, value], i) => (
+            ].filter((item): item is [string, string] => item !== null).map(([label, value], i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13, color: '#64748b' }}>
                 <span>{label}</span><span>{value}</span>
               </div>
