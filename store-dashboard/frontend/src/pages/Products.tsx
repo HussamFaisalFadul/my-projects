@@ -2,12 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, Product as ApiProduct, socket } from '../api';
 import BarcodeScanner from '../BarcodeScanner';
 
-// تعريف الـ Props بشكل صحيح خارج المكون
-interface ProductsProps {
-  products: ApiProduct[];   // استخدم ApiProduct من الاستيراد
-}
-
-export default function Products({ products }: ProductsProps) {
 interface ProductImage {
   id: string;
   url: string;
@@ -35,9 +29,7 @@ interface Variant {
   image_url?: string;
 }
 
-// ✅ الحل: نمدد ApiProduct ولا نكرر الحقول الموجودة فيه
 interface ExtendedProduct extends ApiProduct {
-  // الحقول الإضافية التي ليست في ApiProduct (تخزن محلياً)
   images?: ProductImage[];
   stock_movements?: StockMovement[];
   variants?: Variant[];
@@ -51,7 +43,7 @@ interface ExtendedProduct extends ApiProduct {
   cost_price?: number;
   unit?: string;
   is_active?: boolean;
-  tagsText?: string;   // للنص المدخل في الفورم
+  tagsText?: string;
 }
 
 type ViewMode = 'grid' | 'table';
@@ -370,7 +362,6 @@ export default function Products() {
         minQuantity: form.minQuantity,
         imageUrl: form.images.find(img => img.is_primary)?.url || form.imageUrl || '',
         storeId: getStoreId(),
-        // الحقول الجديدة من ApiProduct
         sku: form.sku || undefined,
         barcode: form.barcode || undefined,
         costPrice: form.cost_price || undefined,
@@ -750,7 +741,6 @@ export default function Products() {
         </div>
       )}
 
-      {/* Modal: سجل الحركات */}
       {showMovementModal && selectedProductForLog && (
         <div className="modal-overlay" onClick={() => setShowMovementModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -811,7 +801,6 @@ export default function Products() {
         </div>
       )}
 
-      {/* Modal: فورم المنتج */}
       {showForm && (
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
           <div className="modal large-modal" onClick={e => e.stopPropagation()}>
