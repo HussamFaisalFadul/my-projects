@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, Product as ApiProduct, socket } from '../api';
 import BarcodeScanner from '../BarcodeScanner';
+interface ProductsProps {
+  products: Product[];
+}
 
+export default function Products({ products }: ProductsProps) {
 interface ProductImage {
   id: string;
   url: string;
