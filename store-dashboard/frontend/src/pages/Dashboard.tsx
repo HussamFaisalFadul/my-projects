@@ -27,7 +27,6 @@ export default function Dashboard({ stats, notifications, orders, products }: Pr
     <div className="page">
       <div className="page-title">لوحة التحكم</div>
 
-      {/* بطاقات الإحصائيات */}
       <div className="stats-grid">
         <div className="stat-card blue">
           <div className="stat-num">{stats?.totalProducts ?? 0}</div>
@@ -48,7 +47,6 @@ export default function Dashboard({ stats, notifications, orders, products }: Pr
       </div>
 
       <div className="two-col">
-        {/* آخر الطلبات */}
         <div className="card">
           <div className="card-title">آخر الطلبات</div>
           {recentOrders.length === 0 ? (
@@ -56,28 +54,15 @@ export default function Dashboard({ stats, notifications, orders, products }: Pr
           ) : (
             <table className="table">
               <thead>
-                <tr>
-                  <th>الزبون</th>
-                  <th>المصدر</th>
-                  <th>المبلغ</th>
-                  <th>الحالة</th>
-                </tr>
+                <tr><th>الزبون</th><th>المصدر</th><th>المبلغ</th><th>الحالة</th></tr>
               </thead>
               <tbody>
                 {recentOrders.map((o) => (
                   <tr key={o.id}>
                     <td>{o.customerName}</td>
-                    <td>
-                      <span className={`source-badge ${o.source === 'واتساب' ? 'whatsapp' : o.source === 'انستغرام' ? 'instagram' : 'direct'}`}>
-                        {o.source}
-                      </span>
-                    </td>
+                    <td><span className={`source-badge ${o.source === 'واتساب' ? 'whatsapp' : o.source === 'انستغرام' ? 'instagram' : 'direct'}`}>{o.source}</span></td>
                     <td>{o.totalPrice} ر</td>
-                    <td>
-                      <span className={`status-badge ${o.status === 'مكتمل' ? 'done' : o.status === 'جديد' ? 'new' : o.status === 'ملغي' ? 'cancelled' : 'pending'}`}>
-                        {o.status}
-                      </span>
-                    </td>
+                    <td><span className={`status-badge ${o.status === 'مكتمل' ? 'done' : o.status === 'جديد' ? 'new' : o.status === 'ملغي' ? 'cancelled' : 'pending'}`}>{o.status}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -85,7 +70,6 @@ export default function Dashboard({ stats, notifications, orders, products }: Pr
           )}
         </div>
 
-        {/* منتجات تحتاج تجديد */}
         <div className="card">
           <div className="card-title">⚠️ تحذيرات المخزون</div>
           {lowStock.length === 0 ? (
@@ -101,16 +85,13 @@ export default function Dashboard({ stats, notifications, orders, products }: Pr
             ))
           )}
 
-          {/* تقرير الذكاء الاصطناعي */}
           <div className="ai-section">
             <button className="ai-btn" onClick={fetchReport} disabled={loadingReport}>
               {loadingReport ? 'جاري التحليل...' : '🤖 تقرير الذكاء الاصطناعي'}
             </button>
             {report && (
               <div className="ai-report">
-                {report.split('\n').map((line, i) => (
-                  <div key={i}>{line}</div>
-                ))}
+                {report.split('\n').map((line, i) => (<div key={i}>{line}</div>))}
               </div>
             )}
           </div>
