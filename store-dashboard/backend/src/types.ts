@@ -47,7 +47,6 @@ export interface Product {
   category: string;
   minQuantity: number;
   imageUrl?: string;
-  // الحقول الجديدة
   sku?: string;
   barcode?: string;
   costPrice?: number;
