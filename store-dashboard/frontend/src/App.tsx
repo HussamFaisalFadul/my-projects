@@ -256,7 +256,7 @@ export default function App() {
           <div className="logo">🏪 {storeName || 'متجري'}</div>
           <nav className="nav">
             <button className={page === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('dashboard')}>الرئيسية</button>
-            <button className={page === 'products' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('products')}>المنتجات</button>
+            <button className={page === 'products' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('products')}>منتجاتي</button>
             <button className={page === 'orders' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('orders')}>الطلبات</button>
             <button className={page === 'pos' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('pos')}>الكاشير</button>
             <button className={page === 'settings' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('settings')}>⚙️ الإعدادات</button>
