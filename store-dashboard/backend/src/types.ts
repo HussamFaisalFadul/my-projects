@@ -38,6 +38,49 @@ export interface Invitation {
   createdAt: Date;
 }
 
+// ===== صور المنتج =====
+export interface ProductImage {
+  id: string;
+  productId: string;
+  url: string;
+  isPrimary: boolean;
+  sortOrder: number;
+  createdAt: Date;
+}
+
+// ===== متغيرات المنتج =====
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  title: string;
+  attributes: Record<string, string>;
+  price: number;
+  costPrice: number;
+  quantity: number;
+  sku?: string;
+  imageUrl?: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: Date;
+}
+
+// ===== حركة المخزون =====
+export interface StockMovement {
+  id: string;
+  productId: string;
+  storeId: string;
+  variantId?: string;
+  type: 'purchase' | 'sale' | 'return' | 'adjustment' | 'damage';
+  quantityChange: number;
+  quantityBefore: number;
+  quantityAfter: number;
+  unitPrice: number;
+  note?: string;
+  createdBy?: string;
+  createdAt: Date;
+}
+
+// ===== المنتج الكامل =====
 export interface Product {
   id: string;
   storeId: string;
@@ -47,13 +90,24 @@ export interface Product {
   category: string;
   minQuantity: number;
   imageUrl?: string;
+  // أعمدة جديدة
   sku?: string;
   barcode?: string;
+  description?: string;
+  brand?: string;
   costPrice?: number;
-  discountType?: string;
-  discountValue?: number;
-  tags?: string;
-  status?: string;
+  salePrice?: number;
+  saleStart?: Date;
+  saleEnd?: Date;
+  weightKg?: number;
+  taxRate?: number;
+  unit?: string;
+  isActive?: boolean;
+  tags?: string[];
+  // علاقات
+  images?: ProductImage[];
+  variants?: ProductVariant[];
+  stockMovements?: StockMovement[];
   createdAt: Date;
   updatedAt: Date;
 }
