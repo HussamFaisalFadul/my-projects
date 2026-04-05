@@ -1,6 +1,7 @@
 import Login from './pages/Login';
 import Settings from './pages/Settings';
 import JoinPage from './pages/JoinPage';
+import POS from './pages/POS';                     // ← إضافة استيراد الكاشير
 import { useState, useEffect, useCallback } from 'react';
 import { socket, api, Product, Order, StoreStats, Notification } from './api';
 import Dashboard from './pages/Dashboard';
@@ -10,7 +11,7 @@ import './App.css';
 
 const BACKEND = 'https://store-dashboard-backend.onrender.com';
 
-type Page = 'dashboard' | 'products' | 'orders' | 'settings';
+type Page = 'dashboard' | 'products' | 'orders' | 'settings' | 'pos';   // ← إضافة 'pos'
 
 export default function App() {
   const [page, setPage] = useState<Page>('dashboard');
@@ -257,6 +258,7 @@ export default function App() {
             <button className={page === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('dashboard')}>الرئيسية</button>
             <button className={page === 'products' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('products')}>المنتجات</button>
             <button className={page === 'orders' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('orders')}>الطلبات</button>
+            <button className={page === 'pos' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('pos')}>💳 الكاشير</button>
             <button className={page === 'settings' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('settings')}>⚙️ الإعدادات</button>
           </nav>
         </div>
@@ -307,6 +309,7 @@ export default function App() {
         {page === 'dashboard' && <Dashboard stats={stats} notifications={notifications} orders={orders} products={products} />}
         {page === 'products' && <Products {...{ products } as any} />}
         {page === 'orders' && <Orders orders={orders} products={products} />}
+        {page === 'pos' && <POS />}                          {/* ← إضافة صفحة الكاشير */}
         {page === 'settings' && <Settings storeName={storeName} onStoreNameChange={(name) => { setStoreName(name); }} />}
       </main>
     </div>
