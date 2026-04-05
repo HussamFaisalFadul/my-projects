@@ -8,9 +8,19 @@ import authRouter from './auth/routes';
 import storesRouter from './stores/routes';
 import { authMiddleware } from './auth/auth';
 import {
-  getProducts, addProduct, updateProduct, deleteProduct,
-  getOrders, addOrder, updateOrderStatus,
-  getStats, getNotifications, addNotification
+  getProducts,
+  addProduct,
+  updateProduct,
+  deleteProduct,
+  getOrders,
+  addOrder,
+  updateOrderStatus,
+  getStats,
+  getNotifications,
+  addNotification,
+  getStockMovements,       // جديد
+  addStockMovement,       // جديد
+  getProductById,         // جديد
 } from './db/queries';
 import { getMemberRole } from './stores/queries';
 import { analyzeInventory, generateDailyReport } from './ai';
@@ -82,6 +92,41 @@ app.delete('/api/products/:id', authMiddleware, requireStore, async (req: any, r
     io.to(req.storeId).emit('stats_updated', await getStats(req.storeId));
     res.json({ success: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ===== مسارات حركات المخزون (جديد) =====
+app.get('/api/products/:id/movements', authMiddleware, requireStore, async (req: any, res) => {
+  try {
+    const movements = await getStockMovements(req.params.id);
+    res.json(movements);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/products/:id/movements', authMiddleware, requireStore, async (req: any, res) => {
+  try {
+    const movement = await addStockMovement({
+      productId: req.params.id,
+      storeId: req.storeId,
+      type: req.body.type,
+      quantityChange: req.body.quantityChange,
+      unitPrice: req.body.unitPrice,
+      note: req.body.note,
+      createdBy: req.user.id,
+    });
+
+    // إعلام عبر WebSocket
+    const product = await getProductById(req.params.id);
+    if (product) {
+      io.to(req.storeId).emit('product_updated', product);
+      io.to(req.storeId).emit('stats_updated', await getStats(req.storeId));
+    }
+
+    res.status(201).json(movement);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ===== API الطلبات =====
