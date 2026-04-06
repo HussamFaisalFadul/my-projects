@@ -8,10 +8,11 @@ import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Orders from './pages/Orders';
 import './App.css';
+import Suppliers from './pages/Suppliers';
 
 const BACKEND = 'https://store-dashboard-backend.onrender.com';
 
-type Page = 'dashboard' | 'products' | 'orders' | 'settings' | 'pos';   // ← إضافة 'pos'
+type Page = 'dashboard' | 'products' | 'orders' | 'settings' | 'pos' | 'suppliers';
 
 export default function App() {
   const [page, setPage] = useState<Page>('dashboard');
@@ -258,6 +259,7 @@ export default function App() {
             <button className={page === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('dashboard')}>الرئيسية</button>
             <button className={page === 'products' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('products')}>المنتجات</button>
             <button className={page === 'orders' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('orders')}>الطلبات</button>
+            <button className={page === 'suppliers' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('suppliers')}>🏭 الموردون</button>
             <button className={page === 'pos' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('pos')}>💳 الكاشير</button>
             <button className={page === 'settings' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('settings')}>⚙️ الإعدادات</button>
           </nav>
