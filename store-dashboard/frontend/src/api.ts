@@ -1,5 +1,20 @@
 import { io, Socket } from 'socket.io-client';
 
+// ===== إضافة واجهة Supplier =====
+export interface Supplier {
+  id: string;
+  name: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  taxNumber?: string;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ProductImage {
   id: string;
   productId: string;
@@ -58,6 +73,7 @@ export interface Product {
   unit?: string;
   isActive?: boolean;
   tags?: string[];
+  supplierId?: string;          // ← حقل المورد
   images?: ProductImage[];
   variants?: ProductVariant[];
   stockMovements?: StockMovement[];
@@ -143,7 +159,7 @@ export async function uploadImageToCloudinary(
   if (!response.ok) throw new Error('فشل رفع الصورة');
   
   const data = await response.json();
-  return data.secure_url; // URL الصورة الجاهزة للحفظ في قاعدة البيانات
+  return data.secure_url;
 }
 
 export const api = {
@@ -228,4 +244,10 @@ export const api = {
       headers: authHeaders(),
       body: JSON.stringify(data),
     }).then(r => r.json()),
+
+  // ===== الموردين (جديد) =====
+  getSuppliers: (): Promise<Supplier[]> =>
+    fetch(`${BACKEND_URL}/suppliers`, { headers: authHeaders() })
+      .then(r => r.json())
+      .then(data => data.suppliers || []),
 };
