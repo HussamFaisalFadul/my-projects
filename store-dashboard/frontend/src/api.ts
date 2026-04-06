@@ -73,7 +73,7 @@ export interface Product {
   unit?: string;
   isActive?: boolean;
   tags?: string[];
-  supplierId?: string;          // ← حقل المورد
+  supplierId?: string;
   images?: ProductImage[];
   variants?: ProductVariant[];
   stockMovements?: StockMovement[];
@@ -245,9 +245,27 @@ export const api = {
       body: JSON.stringify(data),
     }).then(r => r.json()),
 
-  // ===== الموردين (جديد) =====
+  // ===== الموردين (مع التصحيح) =====
   getSuppliers: (): Promise<Supplier[]> =>
-    fetch(`${BACKEND_URL}/suppliers`, { headers: authHeaders() })
-      .then(r => r.json())
-      .then(data => data.suppliers || []),
+    fetch(`${BACKEND_URL}/suppliers`, { headers: authHeaders() }).then(r => r.json()),
+
+  addSupplier: (data: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>): Promise<Supplier> =>
+    fetch(`${BACKEND_URL}/suppliers`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(data),
+    }).then(r => r.json()),
+
+  updateSupplier: (id: string, data: Partial<Supplier>): Promise<Supplier> =>
+    fetch(`${BACKEND_URL}/suppliers/${id}`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify(data),
+    }).then(r => r.json()),
+
+  deleteSupplier: (id: string): Promise<{ success: boolean }> =>
+    fetch(`${BACKEND_URL}/suppliers/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    }).then(r => r.json()),
 };
