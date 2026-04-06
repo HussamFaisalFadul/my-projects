@@ -312,6 +312,8 @@ export default function App() {
         {page === 'products' && <Products {...{ products } as any} />}
         {page === 'orders' && <Orders orders={orders} products={products} />}
         {page === 'pos' && <POS />}                          {/* ← إضافة صفحة الكاشير */}
+        {page === 'suppliers' && <Suppliers />}
+
         {page === 'settings' && <Settings storeName={storeName} onStoreNameChange={(name) => { setStoreName(name); }} />}
       </main>
     </div>
