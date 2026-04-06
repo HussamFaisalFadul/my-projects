@@ -135,7 +135,7 @@ export default function Products() {
   // ===== حالة الموردين =====
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
-  // ===== جلب المنتجات والموردين =====
+  // ===== جلب المنتجات =====
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
@@ -149,9 +149,9 @@ export default function Products() {
     }
   }, []);
 
+  // تأثير المنتجات والـ WebSocket
   useEffect(() => {
     fetchProducts();
-    api.getSuppliers().then(setSuppliers).catch(console.error);
     const refresh = () => fetchProducts();
     socket.on('product_updated', refresh);
     socket.on('product_added', refresh);
@@ -162,6 +162,17 @@ export default function Products() {
       socket.off('product_deleted', refresh);
     };
   }, [fetchProducts]);
+
+  // ===== جلب الموردين (مرة واحدة فقط) =====
+  useEffect(() => {
+    let isMounted = true;
+    api.getSuppliers()
+      .then(data => {
+        if (isMounted) setSuppliers(data);
+      })
+      .catch(err => console.error('فشل جلب الموردين', err));
+    return () => { isMounted = false; };
+  }, []); // لا توجد تبعيات، يعمل مرة واحدة
 
   const toggleMode = () => {
     const next = mode === 'simple' ? 'advanced' : 'simple';
@@ -749,7 +760,7 @@ export default function Products() {
                 </thead>
                 <tbody>
                   {movementsData.length === 0 && (
-                    <tr><td colSpan={6} style={{ textAlign: 'center', color: '#6b7280' }}>لا توجد حركات مسجلة</td></tr>
+                    <tr><td colSpan={6} style={{ textAlign: 'center', color: '#6b7280' }}>لا توجد حركات مسجلة</td>)
                   )}
                   {movementsData.map((m: any) => (
                     <tr key={m.id}>
@@ -759,7 +770,7 @@ export default function Products() {
                       <td>{m.quantityAfter}</td>
                       <td>{m.type}</td>
                       <td>{m.note || '—'}</td>
-                    </tr>
+                    </table>
                   ))}
                 </tbody>
               </table>
