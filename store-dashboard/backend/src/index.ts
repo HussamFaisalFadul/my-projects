@@ -33,6 +33,7 @@ import {
 import { getMemberRole } from './stores/queries';
 import { analyzeInventory, generateDailyReport } from './ai';
 import { ServerToClientEvents, ClientToServerEvents } from './types';
+import pool from './db/connection';
 
 const app = express();
 const httpServer = createServer(app);
@@ -79,17 +80,14 @@ app.post('/api/products', authMiddleware, requireStore, async (req: any, res) =>
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
-// ===== مسار تعديل المنتج (مع تسجيل حركة المخزون عند تغيير الكمية) =====
 app.put('/api/products/:id', authMiddleware, requireStore, async (req: any, res) => {
   try {
-    // نجلب المنتج قبل التعديل لمعرفة الكمية القديمة
     const before = await getProductById(req.params.id);
     if (!before) return res.status(404).json({ error: 'المنتج غير موجود' });
 
     const updated = await updateProduct(req.params.id, req.body);
     if (!updated) return res.status(404).json({ error: 'المنتج غير موجود' });
 
-    // إذا تغيرت الكمية → سجل حركة adjustment
     if (req.body.quantity !== undefined && req.body.quantity !== before.quantity) {
       const diff = updated.quantity - before.quantity;
       await addStockMovement({
@@ -173,7 +171,7 @@ app.delete('/api/products/:id/variants/:variantId', authMiddleware, requireStore
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
-// ===== مسارات حركات المخزون =====
+// ===== مسارات حركات المخزون (المُعدَّل) =====
 app.get('/api/products/:id/movements', authMiddleware, requireStore, async (req: any, res) => {
   try {
     const movements = await getStockMovements(req.params.id);
@@ -185,22 +183,35 @@ app.get('/api/products/:id/movements', authMiddleware, requireStore, async (req:
 
 app.post('/api/products/:id/movements', authMiddleware, requireStore, async (req: any, res) => {
   try {
+    // جلب المنتج الحالي لمعرفة الكمية قبل التغيير
+    const product = await getProductById(req.params.id);
+    if (!product) return res.status(404).json({ error: 'المنتج غير موجود' });
+
+    const quantityBefore = product.quantity;
+    const quantityAfter = Math.max(0, quantityBefore + (req.body.quantityChange || 0));
+
     const movement = await addStockMovement({
       productId: req.params.id,
       storeId: req.storeId,
       type: req.body.type,
       quantityChange: req.body.quantityChange,
+      quantityBefore: quantityBefore,
+      quantityAfter: quantityAfter,
       unitPrice: req.body.unitPrice,
       note: req.body.note,
       createdBy: req.user.id,
     });
-    const product = await getProductById(req.params.id);
-    if (product) {
-      io.to(req.storeId).emit('product_updated', product);
+
+    // الحصول على المنتج المُحدَّث وإرسال الإشعارات
+    const updatedProduct = await getProductById(req.params.id);
+    if (updatedProduct) {
+      io.to(req.storeId).emit('product_updated', updatedProduct);
       io.to(req.storeId).emit('stats_updated', await getStats(req.storeId));
     }
+
     res.status(201).json(movement);
   } catch (err: any) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
