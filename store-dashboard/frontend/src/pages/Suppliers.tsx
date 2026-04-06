@@ -29,7 +29,9 @@ export default function Suppliers() {
       setLoading(true);
       try {
         const data = await api.getSuppliers();
-        if (isMounted) {
+          console.log('البيانات المستلمة:', data);
+          console.log('isMounted:', isMounted);
+            if (isMounted) {
           // تحويل القيم الرقمية التي قد تكون نصوصاً
           const normalized = (Array.isArray(data) ? data : []).map(s => ({
             ...s,
