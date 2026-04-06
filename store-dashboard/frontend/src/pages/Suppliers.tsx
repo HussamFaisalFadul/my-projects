@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
 import { api, Supplier } from '../api';
 
+// دالة مساعدة لتحويل أي قيمة إلى رقم آمن
+const toNumber = (value: any): number => {
+  const num = Number(value);
+  return isNaN(num) ? 0 : num;
+};
+
 export default function Suppliers() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -11,46 +17,56 @@ export default function Suppliers() {
   const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
   const [search, setSearch] = useState('');
 
-  // تحميل الموردين مع رسائل تصحيح
+  // تحميل الموردين
   useEffect(() => {
     let isMounted = true;
     const loadSuppliers = async () => {
-      console.log('🔄 بدء تحميل الموردين...');
       setLoading(true);
       try {
         const data = await api.getSuppliers();
-        console.log('✅ البيانات المستلمة من API:', data);
         if (isMounted) {
-          if (Array.isArray(data)) {
-            setSuppliers(data);
-            console.log(`📦 تم تعيين ${data.length} مورد`);
-          } else {
-            console.error('البيانات المستلمة ليست مصفوفة:', data);
-            setSuppliers([]);
-          }
+          // تحويل القيم الرقمية التي قد تكون نصوصاً
+          const normalized = (Array.isArray(data) ? data : []).map(s => ({
+            ...s,
+            balance: toNumber(s.balance),
+            products_count: toNumber(s.products_count),
+            total_stock_value: toNumber(s.total_stock_value),
+          }));
+          setSuppliers(normalized);
         }
       } catch (err) {
-        console.error('❌ خطأ في جلب الموردين:', err);
-        if (isMounted) setSuppliers([]);
+        console.error('فشل تحميل الموردين', err);
       } finally {
         if (isMounted) setLoading(false);
       }
     };
     loadSuppliers();
     return () => { isMounted = false; };
-  }, []); // يعمل مرة واحدة فقط
+  }, []);
 
   const loadSupplierDetails = async (id: string) => {
     try {
       const token = localStorage.getItem('store_token');
       const storeId = localStorage.getItem('store_id');
-      const res = await fetch(`${api.BACKEND_URL || 'https://store-dashboard-backend.onrender.com'}/suppliers/${id}`, {
+      const res = await fetch(`https://store-dashboard-backend.onrender.com/suppliers/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'x-store-id': storeId || '',
         },
       });
       const data = await res.json();
+      // تحويل القيم الرقمية في التفاصيل أيضاً
+      if (data) {
+        data.balance = toNumber(data.balance);
+        if (data.products) {
+          data.products = data.products.map((p: any) => ({
+            ...p,
+            price: toNumber(p.price),
+            cost_price: toNumber(p.cost_price),
+            quantity: toNumber(p.quantity),
+          }));
+        }
+      }
       setSelectedSupplier(data);
     } catch (err) {
       console.error(err);
@@ -68,7 +84,13 @@ export default function Suppliers() {
       }
       // إعادة تحميل القائمة
       const data = await api.getSuppliers();
-      setSuppliers(Array.isArray(data) ? data : []);
+      const normalized = (Array.isArray(data) ? data : []).map(s => ({
+        ...s,
+        balance: toNumber(s.balance),
+        products_count: toNumber(s.products_count),
+        total_stock_value: toNumber(s.total_stock_value),
+      }));
+      setSuppliers(normalized);
       setShowForm(false);
       setEditingId(null);
       setForm({ name: '', phone: '', email: '', address: '', notes: '' });
@@ -110,6 +132,7 @@ export default function Suppliers() {
     (s.email || '').toLowerCase().includes(search.toLowerCase())
   );
 
+  // الآن أصبحت balance و total_stock_value أرقاماً مؤكدة
   const totalBalance = suppliers.reduce((sum, s) => sum + (s.balance || 0), 0);
   const totalProducts = suppliers.reduce((sum, s) => sum + (s.products_count || 0), 0);
   const totalValue = suppliers.reduce((sum, s) => sum + (s.total_stock_value || 0), 0);
@@ -190,11 +213,11 @@ export default function Suppliers() {
                         {supplier.products_count || 0} منتج
                       </span>
                       <span style={{ background: '#f0fdf4', color: '#059669', padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
-                        {parseFloat(String(supplier.total_stock_value || 0)).toFixed(0)} ر.س قيمة
+                        {toNumber(supplier.total_stock_value).toFixed(0)} ر.س قيمة
                       </span>
                       {supplier.balance > 0 && (
                         <span style={{ background: '#fee2e2', color: '#dc2626', padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
-                          {supplier.balance} ر.س مستحق
+                          {toNumber(supplier.balance).toFixed(0)} ر.س مستحق
                         </span>
                       )}
                     </div>
@@ -244,15 +267,15 @@ export default function Suppliers() {
                 <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: '12px 0' }}>لا توجد منتجات مرتبطة</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 300, overflow: 'auto' }}>
-                  {selectedSupplier.products?.map(p => (
+                  {selectedSupplier.products?.map((p: any) => (
                     <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#f8fafc', borderRadius: 8 }}>
                       <div>
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
-                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{p.category} | متبقي: {p.quantity}</div>
+                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{p.category} | متبقي: {toNumber(p.quantity)}</div>
                       </div>
                       <div style={{ textAlign: 'left' }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#2563eb' }}>{p.price} ر.س</div>
-                        {p.cost_price && <div style={{ fontSize: 11, color: '#64748b' }}>تكلفة: {p.cost_price}</div>}
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#2563eb' }}>{toNumber(p.price).toFixed(2)} ر.س</div>
+                        {p.cost_price && <div style={{ fontSize: 11, color: '#64748b' }}>تكلفة: {toNumber(p.cost_price).toFixed(2)}</div>}
                       </div>
                     </div>
                   ))}
@@ -262,7 +285,7 @@ export default function Suppliers() {
             {selectedSupplier.balance > 0 && (
               <div style={{ background: '#fee2e2', borderRadius: 10, padding: '12px', textAlign: 'center', marginTop: 16 }}>
                 <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 4 }}>الرصيد المستحق</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#dc2626' }}>{selectedSupplier.balance} ر.س</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#dc2626' }}>{toNumber(selectedSupplier.balance).toFixed(0)} ر.س</div>
               </div>
             )}
           </div>
