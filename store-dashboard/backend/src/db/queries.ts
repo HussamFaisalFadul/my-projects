@@ -135,7 +135,7 @@ export async function addOrder(data: Omit<Order, 'id' | 'createdAt' | 'updatedAt
         [order.id, item.productId, item.productName, item.quantity, item.price]
       );
 
-      // تحديث المخزون مع تسجيل الحركة (باستخدام الأعمدة الكاملة)
+      // تحديث المخزون مع تسجيل الحركة
       const current = await client.query(
         'SELECT quantity FROM products WHERE id = $1 FOR UPDATE',
         [item.productId]
@@ -306,8 +306,7 @@ function mapNotification(row: any): Notification {
   };
 }
 
-// ===== صور المنتج (حقيقية) =====
-// الصور مخزنة في Cloudinary، هنا نخزن الـ URL فقط
+// ===== صور المنتج =====
 
 export async function addProductImage(
   productId: string,
@@ -315,7 +314,6 @@ export async function addProductImage(
   isPrimary: boolean = false,
   sortOrder: number = 0
 ): Promise<any> {
-  // إذا كانت هذه هي الصورة الرئيسية، نلغي الرئيسية السابقة أولاً
   if (isPrimary) {
     await pool.query(
       `UPDATE product_images SET is_primary = false WHERE product_id = $1`,
@@ -343,7 +341,7 @@ export async function deleteProductImage(imageId: string): Promise<void> {
   await pool.query(`DELETE FROM product_images WHERE id = $1`, [imageId]);
 }
 
-// ===== متغيرات المنتج (حقيقية) =====
+// ===== متغيرات المنتج =====
 
 export async function addProductVariant(
   productId: string,
@@ -379,7 +377,7 @@ export async function deleteProductVariant(variantId: string): Promise<void> {
   await pool.query(`DELETE FROM product_variants WHERE id = $1`, [variantId]);
 }
 
-// ===== حركات المخزون (حقيقية) =====
+// ===== حركات المخزون (نسخة نموذجية تقوم بتحديث المنتج) =====
 
 export async function getStockMovements(productId: string): Promise<any[]> {
   const result = await pool.query(
@@ -406,23 +404,42 @@ export async function addStockMovement(data: {
   createdBy?: string;
   variantId?: string;
 }): Promise<any> {
-  const result = await pool.query(
-    `INSERT INTO stock_movements
-      (product_id, store_id, variant_id, type, quantity_change, quantity_before, quantity_after, unit_price, note, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-     RETURNING *`,
-    [
-      data.productId,
-      data.storeId,
-      data.variantId || null,
-      data.type,
-      data.quantityChange,
-      data.quantityBefore,
-      data.quantityAfter,
-      data.unitPrice || 0,
-      data.note || null,
-      data.createdBy || null,
-    ]
-  );
-  return result.rows[0];
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // تحديث كمية المنتج
+    await client.query(
+      `UPDATE products SET quantity = $1, updated_at = NOW() WHERE id = $2`,
+      [data.quantityAfter, data.productId]
+    );
+
+    // إدراج الحركة
+    const result = await client.query(
+      `INSERT INTO stock_movements
+        (product_id, store_id, variant_id, type, quantity_change, quantity_before, quantity_after, unit_price, note, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING *`,
+      [
+        data.productId,
+        data.storeId,
+        data.variantId || null,
+        data.type,
+        data.quantityChange,
+        data.quantityBefore,
+        data.quantityAfter,
+        data.unitPrice || 0,
+        data.note || null,
+        data.createdBy || null,
+      ]
+    );
+
+    await client.query('COMMIT');
+    return result.rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
