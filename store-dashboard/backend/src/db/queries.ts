@@ -135,9 +135,24 @@ export async function addOrder(data: Omit<Order, 'id' | 'createdAt' | 'updatedAt
         [order.id, item.productId, item.productName, item.quantity, item.price]
       );
 
+      // تحديث المخزون مع تسجيل الحركة (باستخدام الأعمدة الكاملة)
+      const current = await client.query(
+        'SELECT quantity FROM products WHERE id = $1 FOR UPDATE',
+        [item.productId]
+      );
+      const before = current.rows[0]?.quantity ?? 0;
+      const after = Math.max(0, before - item.quantity);
+
       await client.query(
-        `UPDATE products SET quantity = GREATEST(0, quantity - $1) WHERE id = $2`,
-        [item.quantity, item.productId]
+        'UPDATE products SET quantity = $1, updated_at = NOW() WHERE id = $2',
+        [after, item.productId]
+      );
+
+      await client.query(
+        `INSERT INTO stock_movements 
+          (product_id, store_id, type, quantity_change, quantity_before, quantity_after, unit_price, note)
+         VALUES ($1, $2, 'sale', $3, $4, $5, $6, $7)`,
+        [item.productId, data.storeId, -item.quantity, before, after, item.price, `طلب #${order.id.slice(0, 8)}`]
       );
     }
 
@@ -291,28 +306,123 @@ function mapNotification(row: any): Notification {
   };
 }
 
-// ===== دوال وهمية للتوافق مع index.ts (للميزات غير المستخدمة حالياً) =====
-export const getStockMovements = async (productId: string): Promise<any[]> => [];
-export const addStockMovement = async (data: any): Promise<any> => ({});
-export const addProductImage = async (
+// ===== صور المنتج (حقيقية) =====
+// الصور مخزنة في Cloudinary، هنا نخزن الـ URL فقط
+
+export async function addProductImage(
   productId: string,
   url: string,
-  isPrimary?: boolean,
-  sortOrder?: number
-): Promise<any> => ({});
-export const getProductImages = async (productId: string): Promise<any[]> => [];
-export const deleteProductImage = async (imageId: string): Promise<void> => {};
-export const addProductVariant = async (
+  isPrimary: boolean = false,
+  sortOrder: number = 0
+): Promise<any> {
+  // إذا كانت هذه هي الصورة الرئيسية، نلغي الرئيسية السابقة أولاً
+  if (isPrimary) {
+    await pool.query(
+      `UPDATE product_images SET is_primary = false WHERE product_id = $1`,
+      [productId]
+    );
+  }
+
+  const result = await pool.query(
+    `INSERT INTO product_images (product_id, url, is_primary, sort_order)
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [productId, url, isPrimary, sortOrder]
+  );
+  return result.rows[0];
+}
+
+export async function getProductImages(productId: string): Promise<any[]> {
+  const result = await pool.query(
+    `SELECT * FROM product_images WHERE product_id = $1 ORDER BY sort_order ASC, created_at ASC`,
+    [productId]
+  );
+  return result.rows;
+}
+
+export async function deleteProductImage(imageId: string): Promise<void> {
+  await pool.query(`DELETE FROM product_images WHERE id = $1`, [imageId]);
+}
+
+// ===== متغيرات المنتج (حقيقية) =====
+
+export async function addProductVariant(
   productId: string,
   title: string,
-  attributes?: any,
-  price?: number,
-  costPrice?: number,
-  quantity?: number,
+  attributes: any = {},
+  price: number = 0,
+  costPrice: number = 0,
+  quantity: number = 0,
   sku?: string,
   imageUrl?: string,
-  isActive?: boolean,
-  sortOrder?: number
-): Promise<any> => ({});
-export const getProductVariants = async (productId: string): Promise<any[]> => [];
-export const deleteProductVariant = async (variantId: string): Promise<void> => {};
+  isActive: boolean = true,
+  sortOrder: number = 0
+): Promise<any> {
+  const result = await pool.query(
+    `INSERT INTO product_variants
+      (product_id, title, attributes, price, cost_price, quantity, sku, image_url, is_active, sort_order)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     RETURNING *`,
+    [productId, title, JSON.stringify(attributes), price, costPrice, quantity, sku || null, imageUrl || null, isActive, sortOrder]
+  );
+  return result.rows[0];
+}
+
+export async function getProductVariants(productId: string): Promise<any[]> {
+  const result = await pool.query(
+    `SELECT * FROM product_variants WHERE product_id = $1 ORDER BY sort_order ASC`,
+    [productId]
+  );
+  return result.rows;
+}
+
+export async function deleteProductVariant(variantId: string): Promise<void> {
+  await pool.query(`DELETE FROM product_variants WHERE id = $1`, [variantId]);
+}
+
+// ===== حركات المخزون (حقيقية) =====
+
+export async function getStockMovements(productId: string): Promise<any[]> {
+  const result = await pool.query(
+    `SELECT sm.*, u.name as created_by_name
+     FROM stock_movements sm
+     LEFT JOIN users u ON sm.created_by = u.id
+     WHERE sm.product_id = $1
+     ORDER BY sm.created_at DESC
+     LIMIT 100`,
+    [productId]
+  );
+  return result.rows;
+}
+
+export async function addStockMovement(data: {
+  productId: string;
+  storeId: string;
+  type: 'purchase' | 'sale' | 'return' | 'adjustment' | 'damage';
+  quantityChange: number;
+  quantityBefore: number;
+  quantityAfter: number;
+  unitPrice?: number;
+  note?: string;
+  createdBy?: string;
+  variantId?: string;
+}): Promise<any> {
+  const result = await pool.query(
+    `INSERT INTO stock_movements
+      (product_id, store_id, variant_id, type, quantity_change, quantity_before, quantity_after, unit_price, note, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     RETURNING *`,
+    [
+      data.productId,
+      data.storeId,
+      data.variantId || null,
+      data.type,
+      data.quantityChange,
+      data.quantityBefore,
+      data.quantityAfter,
+      data.unitPrice || 0,
+      data.note || null,
+      data.createdBy || null,
+    ]
+  );
+  return result.rows[0];
+}
