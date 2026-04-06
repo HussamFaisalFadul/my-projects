@@ -256,9 +256,9 @@ export default function App() {
           <div className="logo">🏪 {storeName || 'متجري'}</div>
           <nav className="nav">
             <button className={page === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('dashboard')}>الرئيسية</button>
-            <button className={page === 'products' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('products')}>منتجاتي</button>
+            <button className={page === 'products' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('products')}>المنتجات</button>
             <button className={page === 'orders' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('orders')}>الطلبات</button>
-            <button className={page === 'pos' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('pos')}>الكاشير</button>
+            <button className={page === 'pos' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('pos')}>💳 الكاشير</button>
             <button className={page === 'settings' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('settings')}>⚙️ الإعدادات</button>
           </nav>
         </div>
@@ -309,7 +309,7 @@ export default function App() {
         {page === 'dashboard' && <Dashboard stats={stats} notifications={notifications} orders={orders} products={products} />}
         {page === 'products' && <Products {...{ products } as any} />}
         {page === 'orders' && <Orders orders={orders} products={products} />}
-        {page === 'pos' && <div style={{padding:20}}>POS works!</div>}                          {/* ← إضافة صفحة الكاشير */}
+        {page === 'pos' && <POS />}                          {/* ← إضافة صفحة الكاشير */}
         {page === 'settings' && <Settings storeName={storeName} onStoreNameChange={(name) => { setStoreName(name); }} />}
       </main>
     </div>
