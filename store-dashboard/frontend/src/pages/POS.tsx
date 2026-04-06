@@ -12,6 +12,12 @@ function authHeaders() {
   };
 }
 
+// دالة مساعدة لتحويل أي قيمة إلى رقم
+const toNumber = (value: any): number => {
+  const num = Number(value);
+  return isNaN(num) ? 0 : num;
+};
+
 interface Product {
   id: string;
   name: string;
@@ -50,11 +56,6 @@ interface Invoice {
 }
 
 type PaymentMethod = 'cash' | 'card' | 'transfer' | 'split';
-
-// دالة مساعدة للتحقق من القيم غير null/undefined
-function isNonNull<T>(value: T | null | undefined): value is T {
-  return value !== null && value !== undefined;
-}
 
 export default function POS() {
   const [session, setSession] = useState<Session | null>(null);
@@ -165,55 +166,73 @@ export default function POS() {
     searchTimeout.current = setTimeout(() => searchProducts(value), 300);
   };
 
+  // ===== إضافة منتج إلى السلة مع معالجة الأرقام =====
   const addToCart = (product: Product) => {
+    if (!product || !product.id || !product.name || product.price === undefined) {
+      console.error('منتج غير صالح:', product);
+      return;
+    }
     setCart(prev => {
       const existing = prev.find(i => i.productId === product.id);
+      const unitPrice = toNumber(product.price);
       if (existing) {
-        return prev.map(i => i.productId === product.id
-          ? { ...i, quantity: i.quantity + 1, total: (i.quantity + 1) * i.unitPrice - i.discount }
-          : i
+        return prev.map(i =>
+          i.productId === product.id
+            ? {
+                ...i,
+                quantity: i.quantity + 1,
+                total: (i.quantity + 1) * unitPrice - toNumber(i.discount),
+              }
+            : i
         );
       }
-      return [...prev, {
-        productId: product.id,
-        productName: product.name,
-        barcode: product.barcode,
-        unitPrice: product.price,
-        quantity: 1,
-        discount: 0,
-        total: product.price,
-      }];
+      return [
+        ...prev,
+        {
+          productId: product.id,
+          productName: product.name,
+          barcode: product.barcode || '',
+          unitPrice,
+          quantity: 1,
+          discount: 0,
+          total: unitPrice,
+        },
+      ];
     });
     setSearch('');
     setSearchResults([]);
     searchRef.current?.focus();
   };
 
+  // ===== تحديث عنصر في السلة =====
   const updateCartItem = (index: number, field: 'quantity' | 'discount' | 'unitPrice', value: number) => {
-    setCart(prev => prev.map((item, i) => {
-      if (i !== index) return item;
-      const updated = { ...item, [field]: value };
-      updated.total = updated.quantity * updated.unitPrice - updated.discount;
-      return updated;
-    }));
+    setCart(prev =>
+      prev.map((item, i) => {
+        if (i !== index) return item;
+        const updated = { ...item, [field]: toNumber(value) };
+        updated.total = toNumber(updated.quantity) * toNumber(updated.unitPrice) - toNumber(updated.discount);
+        return updated;
+      })
+    );
   };
 
   const removeFromCart = (index: number) => {
     setCart(prev => prev.filter((_, i) => i !== index));
   };
 
-  // حسابات
-  const subtotal = cart.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
-  const cartDiscount = cart.reduce((sum, i) => sum + i.discount, 0);
+  // ===== الحسابات =====
+  const subtotal = cart.reduce((sum, i) => sum + toNumber(i.quantity) * toNumber(i.unitPrice), 0);
+  const cartDiscount = cart.reduce((sum, i) => sum + toNumber(i.discount), 0);
   const discountAmount = discountType === 'percent'
     ? (subtotal - cartDiscount) * discountValue / 100
     : discountValue;
   const afterDiscount = subtotal - cartDiscount - discountAmount;
   const taxAmount = afterDiscount * taxRate / 100;
   const total = afterDiscount + taxAmount;
-  const paid = parseFloat(paidAmount) || 0;
+  const paid = toNumber(paidAmount);
   const change = Math.max(0, paid - total);
 
+  // ===== إنشاء الفاتورة =====
   const checkout = async () => {
     if (cart.length === 0) return;
     if (!session) { alert('افتح جلسة أولاً'); return; }
@@ -230,14 +249,20 @@ export default function POS() {
           sessionId: session.id,
           customerName: customerName || null,
           customerPhone: customerPhone || null,
-          items: cart,
-          subtotal,
+          items: cart.map(item => ({
+            ...item,
+            unitPrice: toNumber(item.unitPrice),
+            quantity: toNumber(item.quantity),
+            discount: toNumber(item.discount),
+            total: toNumber(item.total),
+          })),
+          subtotal: toNumber(subtotal),
           discountType,
-          discountValue,
-          discountAmount: discountAmount + cartDiscount,
-          taxRate,
-          taxAmount,
-          total,
+          discountValue: toNumber(discountValue),
+          discountAmount: toNumber(discountAmount + cartDiscount),
+          taxRate: toNumber(taxRate),
+          taxAmount: toNumber(taxAmount),
+          total: toNumber(total),
           paidAmount: paymentMethod === 'cash' ? paid : total,
           changeAmount: change,
           paymentMethod,
@@ -246,6 +271,14 @@ export default function POS() {
       });
       const invoice = await res.json();
       if (invoice.id) {
+        // تحويل القيم إلى أرقام
+        invoice.total = toNumber(invoice.total);
+        invoice.items = (invoice.items || []).map((item: any) => ({
+          ...item,
+          total: toNumber(item.total),
+          unitPrice: toNumber(item.unitPrice),
+          quantity: toNumber(item.quantity),
+        }));
         setLastInvoice(invoice);
         setShowInvoice(true);
         setCart([]);
@@ -257,7 +290,10 @@ export default function POS() {
         setNotes('');
         loadSessionInvoices(session.id);
       }
-    } catch { alert('خطأ في إتمام العملية'); }
+    } catch (err) {
+      console.error(err);
+      alert('خطأ في إتمام العملية');
+    }
     setProcessing(false);
   };
 
@@ -310,7 +346,6 @@ export default function POS() {
 
   return (
     <div dir="rtl" style={{ display: 'flex', height: 'calc(100vh - 60px)', fontFamily: 'Tajawal, sans-serif', background: '#f1f5f9', overflow: 'hidden' }}>
-
       <style>{`
         @media print {
           body * { visibility: hidden; }
@@ -319,9 +354,8 @@ export default function POS() {
         }
       `}</style>
 
-      {/* الجانب الأيسر — المنتجات والبحث */}
+      {/* الجانب الأيسر - المنتجات والبحث */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, overflow: 'hidden' }}>
-
         {/* شريط البحث */}
         <div style={{ position: 'relative', marginBottom: 12 }}>
           <input
@@ -354,16 +388,16 @@ export default function POS() {
                 >
                   <div>
                     <div style={{ fontWeight: 600 }}>{p.name}</div>
-                    <div style={{ fontSize: 12, color: '#64748b' }}>{p.category} | متبقي: {p.quantity}</div>
+                    <div style={{ fontSize: 12, color: '#64748b' }}>{p.category || 'عام'} | متبقي: {p.quantity}</div>
                   </div>
-                  <div style={{ fontWeight: 700, color: '#2563eb', fontSize: 16 }}>{p.price} ر.س</div>
+                  <div style={{ fontWeight: 700, color: '#2563eb', fontSize: 16 }}>{toNumber(p.price).toFixed(2)} ر.س</div>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* الكارت */}
+        {/* السلة */}
         <div style={{ flex: 1, background: 'white', borderRadius: 16, overflow: 'auto', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
           {cart.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8' }}>
@@ -387,7 +421,7 @@ export default function POS() {
                       <input
                         type="number"
                         value={item.unitPrice}
-                        onChange={e => updateCartItem(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
+                        onChange={e => updateCartItem(idx, 'unitPrice', parseFloat(e.target.value))}
                         style={{ width: 80, padding: '4px 8px', borderRadius: 6, border: '1px solid #e2e8f0', textAlign: 'center' }}
                       />
                     </td>
@@ -404,12 +438,12 @@ export default function POS() {
                       <input
                         type="number"
                         value={item.discount}
-                        onChange={e => updateCartItem(idx, 'discount', parseFloat(e.target.value) || 0)}
+                        onChange={e => updateCartItem(idx, 'discount', parseFloat(e.target.value))}
                         style={{ width: 70, padding: '4px 8px', borderRadius: 6, border: '1px solid #e2e8f0', textAlign: 'center' }}
                       />
                     </td>
                     <td style={{ padding: '10px 8px', fontWeight: 700, color: '#2563eb' }}>
-                      {item.total.toFixed(2)} ر.س
+                      {toNumber(item.total).toFixed(2)} ر.س
                     </td>
                     <td style={{ padding: '10px 8px' }}>
                       <button onClick={() => removeFromCart(idx)}
@@ -425,9 +459,8 @@ export default function POS() {
         </div>
       </div>
 
-      {/* الجانب الأيمن — الحساب والدفع */}
+      {/* الجانب الأيمن - الحساب والدفع */}
       <div style={{ width: 340, background: 'white', display: 'flex', flexDirection: 'column', boxShadow: '-2px 0 8px rgba(0,0,0,0.06)', overflow: 'auto' }}>
-
         {/* رأس الجلسة */}
         <div style={{ padding: '12px 16px', background: '#1e293b', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -447,7 +480,6 @@ export default function POS() {
         </div>
 
         <div style={{ flex: 1, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-
           {/* بيانات العميل */}
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>بيانات العميل (اختياري)</div>
@@ -483,18 +515,18 @@ export default function POS() {
           {/* الإجمالي */}
           <div style={{ background: '#f8fafc', borderRadius: 12, padding: 14 }}>
             {[
-              ['المجموع الفرعي', `${subtotal.toFixed(2)} ر.س`],
-              ['خصم المنتجات', `- ${cartDiscount.toFixed(2)} ر.س`],
-              discountAmount > 0 ? ['خصم إضافي', `- ${discountAmount.toFixed(2)} ر.س`] : null,
-              taxAmount > 0 ? [`ضريبة ${taxRate}%`, `+ ${taxAmount.toFixed(2)} ر.س`] : null,
-            ].filter(isNonNull).map(([label, value], i) => (
+              ['المجموع الفرعي', `${toNumber(subtotal).toFixed(2)} ر.س`],
+              ['خصم المنتجات', `- ${toNumber(cartDiscount).toFixed(2)} ر.س`],
+              discountAmount > 0 ? ['خصم إضافي', `- ${toNumber(discountAmount).toFixed(2)} ر.س`] : null,
+              taxAmount > 0 ? [`ضريبة ${taxRate}%`, `+ ${toNumber(taxAmount).toFixed(2)} ر.س`] : null,
+            ].filter(item => item !== null).map(([label, value], i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13, color: '#64748b' }}>
                 <span>{label}</span><span>{value}</span>
               </div>
             ))}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTop: '2px solid #e2e8f0', fontWeight: 700, fontSize: 18 }}>
               <span>الإجمالي</span>
-              <span style={{ color: '#2563eb' }}>{total.toFixed(2)} ر.س</span>
+              <span style={{ color: '#2563eb' }}>{toNumber(total).toFixed(2)} ر.س</span>
             </div>
           </div>
 
@@ -527,11 +559,11 @@ export default function POS() {
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>المبلغ المدفوع</div>
               <input type="number" value={paidAmount} onChange={e => setPaidAmount(e.target.value)}
-                placeholder={total.toFixed(2)}
+                placeholder={toNumber(total).toFixed(2)}
                 style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 16, textAlign: 'center', boxSizing: 'border-box' }} />
               {paid >= total && paid > 0 && (
                 <div style={{ marginTop: 6, padding: '8px', background: '#dcfce7', borderRadius: 8, textAlign: 'center', fontWeight: 700, color: '#166534' }}>
-                  الباقي: {change.toFixed(2)} ر.س
+                  الباقي: {toNumber(change).toFixed(2)} ر.س
                 </div>
               )}
             </div>
@@ -551,7 +583,7 @@ export default function POS() {
               cursor: cart.length === 0 ? 'not-allowed' : 'pointer',
               fontFamily: 'Tajawal, sans-serif', fontWeight: 700,
             }}>
-            {processing ? 'جاري المعالجة...' : `💳 إتمام البيع — ${total.toFixed(2)} ر.س`}
+            {processing ? 'جاري المعالجة...' : `💳 إتمام البيع — ${toNumber(total).toFixed(2)} ر.س`}
           </button>
         </div>
       </div>
@@ -586,8 +618,8 @@ export default function POS() {
                   {(lastInvoice.items || []).map((item: any, i: number) => (
                     <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '6px 4px', fontSize: 13 }}>{item.productName}</td>
-                      <td style={{ padding: '6px 4px', textAlign: 'center', fontSize: 13 }}>{item.quantity}</td>
-                      <td style={{ padding: '6px 4px', textAlign: 'left', fontSize: 13 }}>{item.total} ر.س</td>
+                      <td style={{ padding: '6px 4px', textAlign: 'center', fontSize: 13 }}>{toNumber(item.quantity)}</td>
+                      <td style={{ padding: '6px 4px', textAlign: 'left', fontSize: 13 }}>{toNumber(item.total).toFixed(2)} ر.س</td>
                     </tr>
                   ))}
                 </tbody>
@@ -596,7 +628,7 @@ export default function POS() {
               <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 16 }}>
                   <span>الإجمالي</span>
-                  <span>{lastInvoice.total} ر.س</span>
+                  <span>{toNumber(lastInvoice.total).toFixed(2)} ر.س</span>
                 </div>
                 <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
                   طريقة الدفع: {lastInvoice.payment_method === 'cash' ? 'كاش' : lastInvoice.payment_method === 'card' ? 'بطاقة' : 'تحويل'}
@@ -633,10 +665,10 @@ export default function POS() {
                   <span>عدد الفواتير</span><strong>{summary.summary?.total_invoices}</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span>إجمالي المبيعات</span><strong>{parseFloat(summary.summary?.total_sales || 0).toFixed(2)} ر.س</strong>
+                  <span>إجمالي المبيعات</span><strong>{toNumber(summary.summary?.total_sales).toFixed(2)} ر.س</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span>مبيعات كاش</span><strong>{parseFloat(summary.summary?.cash_sales || 0).toFixed(2)} ر.س</strong>
+                  <span>مبيعات كاش</span><strong>{toNumber(summary.summary?.cash_sales).toFixed(2)} ر.س</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>رصيد الافتتاح</span><strong>{session?.opening_cash} ر.س</strong>
