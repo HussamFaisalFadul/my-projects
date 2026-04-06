@@ -19,7 +19,7 @@ interface Variant {
   image_url?: string;
 }
 
-type ExtendedProduct = Omit<ApiProduct, 'variants' | 'stockMovements'> & {
+type ExtendedProduct = ApiProduct & {
   images?: ProductImage[];
   variants?: Variant[];
   brand?: string;
@@ -33,7 +33,7 @@ type ExtendedProduct = Omit<ApiProduct, 'variants' | 'stockMovements'> & {
   unit?: string;
   is_active?: boolean;
   tagsText?: string;
-  supplierId?: string; // إضافة حقل المورد
+  supplierId?: string;
 };
 
 type ViewMode = 'grid' | 'table';
