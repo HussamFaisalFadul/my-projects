@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { api, Product as ApiProduct, socket, uploadImageToCloudinary } from '../api';
+import { api, Product as ApiProduct, socket, uploadImageToCloudinary, Supplier } from '../api';
 import BarcodeScanner from '../BarcodeScanner';
 
 interface ProductImage {
@@ -33,6 +33,7 @@ type ExtendedProduct = Omit<ApiProduct, 'variants' | 'stockMovements'> & {
   unit?: string;
   is_active?: boolean;
   tagsText?: string;
+  supplierId?: string; // إضافة حقل المورد
 };
 
 type ViewMode = 'grid' | 'table';
@@ -99,6 +100,7 @@ const emptyForm = {
   unit: 'قطعة',
   is_active: true,
   tagsText: '',
+  supplierId: '', // حقل المورد
 };
 
 type FormState = typeof emptyForm;
@@ -130,7 +132,10 @@ export default function Products() {
   const [movementNote, setMovementNote] = useState('');
   const [movementsData, setMovementsData] = useState<any[]>([]);
 
-  // ===== جلب المنتجات من الـ DB =====
+  // ===== حالة الموردين =====
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+
+  // ===== جلب المنتجات والموردين =====
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
@@ -146,6 +151,7 @@ export default function Products() {
 
   useEffect(() => {
     fetchProducts();
+    api.getSuppliers().then(setSuppliers).catch(console.error);
     const refresh = () => fetchProducts();
     socket.on('product_updated', refresh);
     socket.on('product_added', refresh);
@@ -218,6 +224,7 @@ export default function Products() {
       unit: product.unit || 'قطعة',
       is_active: product.isActive ?? (product as any).is_active ?? true,
       tagsText: Array.isArray(product.tags) ? product.tags.join(', ') : '',
+      supplierId: product.supplierId || '', // قراءة المورد
     });
     setActiveTab('basic');
     setShowForm(true);
@@ -241,7 +248,6 @@ export default function Products() {
     setForm(prev => ({ ...prev, images: newImages }));
   };
 
-  // ===== رفع الصور لـ Cloudinary =====
   const addImagesFromFiles = async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
     const storeId = getStoreId();
@@ -332,7 +338,7 @@ export default function Products() {
     setForm(prev => ({ ...prev, variants: prev.variants.filter((_, i) => i !== index) }));
   };
 
-  // ===== حفظ المنتج — مع تطابق الـ Types =====
+  // ===== حفظ المنتج (مع إرسال supplierId) =====
   const handleSubmit = async () => {
     if (!form.name.trim() || form.price <= 0) return;
     setSaving(true);
@@ -340,7 +346,6 @@ export default function Products() {
       const finalImages = syncPrimaryImage(form.images)
         .map((img, idx) => ({ ...img, sort_order: idx }));
 
-      // ⭐ التعديل المطلوب: إرسال الصور والمتغيرات بالشكل الصحيح لـ api.ts
       const baseProduct = {
         name: form.name.trim(),
         price: form.price,
@@ -363,23 +368,22 @@ export default function Products() {
         isActive: form.is_active,
         tags: form.tagsText.split(',').map(t => t.trim()).filter(Boolean),
         status: form.is_active ? 'published' : 'draft',
-        // الصور حسب ProductImage في api.ts
+        supplierId: form.supplierId || null, // إرسال المورد
         images: finalImages.map(img => ({
           id: img.id,
-          productId: '',          // سيتم تعيينه من الخادم (يمكن تركه فارغاً)
+          productId: '',
           url: img.url,
           isPrimary: img.is_primary,
           sortOrder: img.sort_order,
           createdAt: new Date().toISOString(),
         })),
-        // المتغيرات حسب ProductVariant في api.ts
         variants: form.variants.map((v, idx) => ({
           id: v.id,
           productId: '',
           title: v.title,
           attributes: v.attributes,
           price: v.price,
-          costPrice: 0,               // يمكنك تعيينه من v.cost_price إذا وجد
+          costPrice: 0,
           quantity: v.quantity,
           sku: v.sku || undefined,
           imageUrl: v.image_url || undefined,
@@ -431,7 +435,7 @@ export default function Products() {
     }
   };
 
-  // ===== حركة المخزون من الـ DB =====
+  // ===== حركة المخزون =====
   const showStockLog = async (product: ExtendedProduct) => {
     setSelectedProductForLog(product);
     setMovementsData([]);
@@ -869,6 +873,26 @@ export default function Products() {
                       </select>
                     </div>
                   </div>
+                  <div className="form-grid-2">
+                    <div className="form-row">
+                      <label>المورد</label>
+                      <select
+                        value={form.supplierId}
+                        onChange={e => setForm({ ...form, supplierId: e.target.value })}
+                      >
+                        <option value="">— بدون مورد —</option>
+                        {suppliers.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-row form-row-checkbox">
+                      <label>
+                        <input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} />
+                        المنتج نشط
+                      </label>
+                    </div>
+                  </div>
                   <div className="form-row">
                     <label>الوصف</label>
                     <textarea rows={4} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
@@ -877,12 +901,6 @@ export default function Products() {
                     <div className="form-row">
                       <label>الوسوم (مفصولة بفاصلة)</label>
                       <input value={form.tagsText} onChange={e => setForm({ ...form, tagsText: e.target.value })} placeholder="مثال: جديد, مميز" />
-                    </div>
-                    <div className="form-row form-row-checkbox">
-                      <label>
-                        <input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} />
-                        المنتج نشط
-                      </label>
                     </div>
                   </div>
                 </div>
