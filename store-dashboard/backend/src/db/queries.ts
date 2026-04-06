@@ -291,12 +291,28 @@ function mapNotification(row: any): Notification {
   };
 }
 
-// تصدير دوال إضافية للتوافق مع `index.ts` (قد لا تستخدمها الآن)
-export const getStockMovements = async () => [];
-export const addStockMovement = async () => ({});
-export const addProductImage = async () => ({});
-export const getProductImages = async () => [];
-export const deleteProductImage = async () => {};
-export const addProductVariant = async () => ({});
-export const getProductVariants = async () => [];
-export const deleteProductVariant = async () => {};
+// ===== دوال وهمية للتوافق مع index.ts (للميزات غير المستخدمة حالياً) =====
+export const getStockMovements = async (productId: string): Promise<any[]> => [];
+export const addStockMovement = async (data: any): Promise<any> => ({});
+export const addProductImage = async (
+  productId: string,
+  url: string,
+  isPrimary?: boolean,
+  sortOrder?: number
+): Promise<any> => ({});
+export const getProductImages = async (productId: string): Promise<any[]> => [];
+export const deleteProductImage = async (imageId: string): Promise<void> => {};
+export const addProductVariant = async (
+  productId: string,
+  title: string,
+  attributes?: any,
+  price?: number,
+  costPrice?: number,
+  quantity?: number,
+  sku?: string,
+  imageUrl?: string,
+  isActive?: boolean,
+  sortOrder?: number
+): Promise<any> => ({});
+export const getProductVariants = async (productId: string): Promise<any[]> => [];
+export const deleteProductVariant = async (variantId: string): Promise<void> => {};
