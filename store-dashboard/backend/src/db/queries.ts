@@ -333,16 +333,16 @@ export async function addStockMovement(data: {
       [data.quantityAfter, data.productId]
     );
     const result = await client.query(
-      `INSERT INTO stock_movements 
-      (product_id, store_id, variant_id, type, quantity, quantity_change, quantity_before, quantity_after, unit_price, note, created_by)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-      [
-        data.productId, data.storeId, data.variantId || null,
-        data.type, Math.abs(data.quantityChange),
-        data.quantityChange, data.quantityBefore, data.quantityAfter,
-        data.unitPrice || 0, data.note || null, data.createdBy || null
-      ]
-    );
+  `INSERT INTO stock_movements 
+  (product_id, store_id, type, quantity, quantity_change, quantity_before, quantity_after, unit_price, note, created_by)
+  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+  [
+    data.productId, data.storeId,
+    data.type, Math.abs(data.quantityChange),
+    data.quantityChange, data.quantityBefore, data.quantityAfter,
+    data.unitPrice || 0, data.note || null, data.createdBy || null
+  ]
+);
     await client.query('COMMIT');
     return result.rows[0];
   } catch (err) {
