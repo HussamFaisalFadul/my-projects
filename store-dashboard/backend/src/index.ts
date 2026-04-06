@@ -50,6 +50,7 @@ app.use('/auth', authRouter);
 app.use('/stores', storesRouter);
 app.use('/pos', posRouter);
 app.use('/suppliers', suppliersRouter);
+
 // ===== ميدلوير التحقق من المتجر =====
 async function requireStore(req: any, res: any, next: any) {
   const storeId = req.headers['x-store-id'] as string;
@@ -103,7 +104,7 @@ app.delete('/api/products/:id', authMiddleware, requireStore, async (req: any, r
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
-// ===== صور المنتج (مسارات جديدة) =====
+// ===== صور المنتج =====
 app.post('/api/products/:id/images', authMiddleware, requireStore, async (req: any, res) => {
   try {
     const { url, isPrimary, sortOrder } = req.body;
@@ -126,7 +127,7 @@ app.delete('/api/products/:id/images/:imageId', authMiddleware, requireStore, as
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
-// ===== متغيرات المنتج (مسارات جديدة) =====
+// ===== متغيرات المنتج =====
 app.post('/api/products/:id/variants', authMiddleware, requireStore, async (req: any, res) => {
   try {
     const { title, attributes, price, costPrice, quantity, sku, imageUrl, isActive, sortOrder } = req.body;
@@ -172,13 +173,11 @@ app.post('/api/products/:id/movements', authMiddleware, requireStore, async (req
       note: req.body.note,
       createdBy: req.user.id,
     });
-
     const product = await getProductById(req.params.id);
     if (product) {
       io.to(req.storeId).emit('product_updated', product);
       io.to(req.storeId).emit('stats_updated', await getStats(req.storeId));
     }
-
     res.status(201).json(movement);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -198,10 +197,25 @@ app.post('/api/orders', authMiddleware, requireStore, async (req: any, res) => {
     io.to(req.storeId).emit('stats_updated', await getStats(req.storeId));
     const n = await addNotification(req.storeId, 'طلب_جديد', `طلب جديد من ${order.customerName} — ${order.totalPrice} ريال`);
     io.to(req.storeId).emit('notification', n);
+
+    // ===== الكود الجديد: تسجيل حركة مخزون لكل منتج في الطلب =====
     const products = await getProducts(req.storeId);
     for (const item of order.items) {
       const product = products.find(p => p.id === item.productId);
       if (product) {
+        // الكمية قبل النقص = الكمية الحالية + الكمية المباعة (لأنها لم تُنقص بعد في قاعدة البيانات)
+        const quantityBefore = product.quantity + item.quantity;
+        await addStockMovement({
+          productId: item.productId,
+          storeId: req.storeId,
+          type: 'sale',
+          quantityChange: -item.quantity,
+          quantityBefore: quantityBefore,
+          quantityAfter: product.quantity,
+          unitPrice: item.price,
+          note: `طلب #${order.id.slice(0, 8)}`,
+          createdBy: req.user.id,
+        });
         io.to(req.storeId).emit('product_updated', product);
         const aiMsg = analyzeInventory(product);
         if (aiMsg) {
@@ -210,6 +224,7 @@ app.post('/api/orders', authMiddleware, requireStore, async (req: any, res) => {
         }
       }
     }
+
     res.status(201).json(order);
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
