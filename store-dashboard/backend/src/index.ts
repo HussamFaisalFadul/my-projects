@@ -212,7 +212,7 @@ app.post('/api/products/:id/movements', authMiddleware, requireStore, async (req
   }
 });
 
-// ===== API الطلبات =====
+// ===== API الطلبات (بعد التعديل) =====
 app.get('/api/orders', authMiddleware, requireStore, async (req: any, res) => {
   try { res.json(await getOrders(req.storeId)); }
   catch (err: any) { res.status(500).json({ error: err.message }); }
@@ -226,11 +226,37 @@ app.post('/api/orders', authMiddleware, requireStore, async (req: any, res) => {
     const n = await addNotification(req.storeId, 'طلب_جديد', `طلب جديد من ${order.customerName} — ${order.totalPrice} ريال`);
     io.to(req.storeId).emit('notification', n);
 
-    // تم إزالة الحلقة التي كانت تسجل حركات المخزون مرة أخرى
-    // لأن addOrder في queries.ts تقوم بذلك بالفعل داخل transaction
+    // ===== الكود الجديد — نجلب كل منتج منفرداً بعد التحديث =====
+    for (const item of order.items) {
+      const product = await getProductById(item.productId);
+      if (product) {
+        // الكمية بعد النقص موجودة في product.quantity
+        // نحسب الكمية قبل النقص بإضافة quantity المباعة
+        await addStockMovement({
+          productId: item.productId,
+          storeId: req.storeId,
+          type: 'sale',
+          quantityChange: -item.quantity,
+          quantityBefore: product.quantity + item.quantity,
+          quantityAfter: product.quantity,
+          unitPrice: item.price,
+          note: `طلب #${order.id.slice(0, 8)}`,
+          createdBy: req.user.id,
+        });
+        io.to(req.storeId).emit('product_updated', product);
+        const aiMsg = analyzeInventory(product);
+        if (aiMsg) {
+          const an = await addNotification(req.storeId, 'تحذير_مخزون', aiMsg);
+          io.to(req.storeId).emit('notification', an);
+        }
+      }
+    }
 
     res.status(201).json(order);
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) {
+    console.error('❌ خطأ في إضافة الطلب:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.put('/api/orders/:id/status', authMiddleware, requireStore, async (req: any, res) => {
