@@ -1,7 +1,7 @@
 import Login from './pages/Login';
 import Settings from './pages/Settings';
 import JoinPage from './pages/JoinPage';
-import POS from './pages/POS';                     // ← إضافة استيراد الكاشير
+import POS from './pages/POS';
 import { useState, useEffect, useCallback } from 'react';
 import { socket, api, Product, Order, StoreStats, Notification } from './api';
 import Dashboard from './pages/Dashboard';
@@ -22,7 +22,6 @@ export default function App() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [creatingStore, setCreatingStore] = useState(false);
   const [newStoreName, setNewStoreName] = useState('');
   const [storeError, setStoreError] = useState('');
@@ -50,7 +49,6 @@ export default function App() {
     const savedStoreId = localStorage.getItem('store_id');
     const pendingJoinToken = localStorage.getItem('pending_join_token');
 
-    // لو عنده دعوة معلقة بعد تسجيل الدخول
     if (savedToken && pendingJoinToken) {
       fetch(`${BACKEND}/stores/join/${pendingJoinToken}`, {
         method: 'POST',
@@ -68,7 +66,6 @@ export default function App() {
             setCurrentStoreId(data.storeId);
             setStoreName(data.storeName);
           } else {
-            // فشل القبول — امسح التوكن المعلق وكمّل
             localStorage.removeItem('pending_join_token');
           }
         })
@@ -77,7 +74,6 @@ export default function App() {
       return;
     }
 
-    // لو عنده توكن بدون store_id اجلب متاجره
     if (savedToken && !savedStoreId) {
       fetch(`${BACKEND}/stores`, {
         headers: { 'Authorization': `Bearer ${savedToken}` }
@@ -145,10 +141,9 @@ export default function App() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   }, []);
 
-  // ===== تحميل البيانات =====
+  // ===== تحميل البيانات (بدون loading) =====
   useEffect(() => {
     if (!token || !currentStoreId) return;
-    setLoading(true);
     Promise.all([
       api.getProducts(),
       api.getOrders(),
@@ -159,8 +154,7 @@ export default function App() {
       setOrders(Array.isArray(o) ? o : []);
       setStats(s);
       setNotifications(Array.isArray(n) ? n : []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(() => {});
   }, [token, currentStoreId]);
 
   // ===== الويب سوكيت =====
@@ -198,7 +192,6 @@ export default function App() {
     return <Login onLogin={handleLogin} />;
   }
 
-  // ===== ما عنده متجر — خيار إنشاء أو الانتظار =====
   if (!currentStoreId) {
     return (
       <div className="app" dir="rtl">
@@ -227,8 +220,6 @@ export default function App() {
           >
             {creatingStore ? 'جاري الإنشاء...' : 'إنشاء المتجر'}
           </button>
-
-          {/* لو عنده دعوة معلقة */}
           {localStorage.getItem('pending_join_token') && (
             <div style={{ marginTop: 20, padding: 16, background: '#fef3c7', borderRadius: 10 }}>
               <p style={{ color: '#92400e', fontSize: 14, marginBottom: 8 }}>
@@ -240,8 +231,6 @@ export default function App() {
       </div>
     );
   }
-
-  
 
   return (
     <div className="app" dir="rtl">
@@ -304,9 +293,8 @@ export default function App() {
         {page === 'dashboard' && <Dashboard stats={stats} notifications={notifications} orders={orders} products={products} />}
         {page === 'products' && <Products {...{ products } as any} />}
         {page === 'orders' && <Orders orders={orders} products={products} />}
-        {page === 'pos' && <POS />}                          {/* ← إضافة صفحة الكاشير */}
+        {page === 'pos' && <POS />}
         {page === 'suppliers' && <Suppliers />}
-
         {page === 'settings' && <Settings storeName={storeName} onStoreNameChange={(name) => { setStoreName(name); }} />}
       </main>
     </div>
