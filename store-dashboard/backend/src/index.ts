@@ -79,10 +79,31 @@ app.post('/api/products', authMiddleware, requireStore, async (req: any, res) =>
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+// ===== مسار تعديل المنتج (مع تسجيل حركة المخزون عند تغيير الكمية) =====
 app.put('/api/products/:id', authMiddleware, requireStore, async (req: any, res) => {
   try {
+    // نجلب المنتج قبل التعديل لمعرفة الكمية القديمة
+    const before = await getProductById(req.params.id);
+    if (!before) return res.status(404).json({ error: 'المنتج غير موجود' });
+
     const updated = await updateProduct(req.params.id, req.body);
     if (!updated) return res.status(404).json({ error: 'المنتج غير موجود' });
+
+    // إذا تغيرت الكمية → سجل حركة adjustment
+    if (req.body.quantity !== undefined && req.body.quantity !== before.quantity) {
+      const diff = updated.quantity - before.quantity;
+      await addStockMovement({
+        productId: updated.id,
+        storeId: req.storeId,
+        type: 'adjustment',
+        quantityChange: diff,
+        quantityBefore: before.quantity,
+        quantityAfter: updated.quantity,
+        note: req.body.movementNote || 'تعديل يدوي',
+        createdBy: req.user.id,
+      });
+    }
+
     io.to(req.storeId).emit('product_updated', updated);
     io.to(req.storeId).emit('stats_updated', await getStats(req.storeId));
     const aiMsg = analyzeInventory(updated);
@@ -198,12 +219,10 @@ app.post('/api/orders', authMiddleware, requireStore, async (req: any, res) => {
     const n = await addNotification(req.storeId, 'طلب_جديد', `طلب جديد من ${order.customerName} — ${order.totalPrice} ريال`);
     io.to(req.storeId).emit('notification', n);
 
-    // ===== الكود الجديد: تسجيل حركة مخزون لكل منتج في الطلب =====
     const products = await getProducts(req.storeId);
     for (const item of order.items) {
       const product = products.find(p => p.id === item.productId);
       if (product) {
-        // الكمية قبل النقص = الكمية الحالية + الكمية المباعة (لأنها لم تُنقص بعد في قاعدة البيانات)
         const quantityBefore = product.quantity + item.quantity;
         await addStockMovement({
           productId: item.productId,
