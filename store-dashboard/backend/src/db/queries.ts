@@ -144,12 +144,26 @@ export async function addProduct(data: any): Promise<Product> {
       }
     }
 
-    // تسجيل حركة المخزون الأولية
+    // =====================================================
+    // ⚠️ تعطيل تسجيل حركة المخزون الأولية مؤقتاً لحين تعديل هيكل جدول stock_movements
+    // الجدول الحالي لا يحتوي على الأعمدة المطلوبة (quantity_change, quantity_before, quantity_after, note)
+    // الحل الدائم: إضافة الأعمدة المفقودة عبر ALTER TABLE أو استخدام أعمدة موجودة (quantity, notes)
+    // =====================================================
+    /*
     if ((data.quantity ?? 0) > 0) {
       await client.query(
         `INSERT INTO stock_movements (product_id, store_id, type, quantity_change, quantity_before, quantity_after, note, created_by)
          VALUES ($1,$2,'purchase',$3,0,$4,'مخزون أولي عند الإضافة',$5)`,
         [product.id, data.storeId, data.quantity, data.quantity, data.createdBy || null]
+      );
+    }
+    */
+    // مؤقتاً: يمكنك إضافة حركة مبسطة باستخدام الأعمدة الموجودة:
+    if ((data.quantity ?? 0) > 0) {
+      await client.query(
+        `INSERT INTO stock_movements (product_id, store_id, type, quantity, notes, created_by)
+         VALUES ($1,$2,'purchase',$3,'مخزون أولي عند الإضافة',$4)`,
+        [product.id, data.storeId, data.quantity, data.createdBy || null]
       );
     }
 
@@ -249,7 +263,7 @@ export async function deleteProduct(id: string): Promise<boolean> {
   return (result.rowCount ?? 0) > 0;
 }
 
-// ===== دوال إضافية للصور والمتغيرات (متوافقة مع الجداول الحالية) =====
+// ===== دوال إضافية للصور والمتغيرات =====
 
 export async function addProductImage(
   productId: string,
@@ -311,14 +325,14 @@ export async function deleteProductVariant(variantId: string) {
   await pool.query('DELETE FROM product_variants WHERE id = $1', [variantId]);
 }
 
-// ===== حركة المخزون =====
+// ===== حركة المخزون (معدل ليتوافق مع الجدول الحالي) =====
 
 export async function addStockMovement(data: {
   productId: string;
   storeId: string;
   variantId?: string;
   type: StockMovement['type'];
-  quantityChange: number;
+  quantityChange: number;     // قد لا يستخدم مباشرة
   unitPrice?: number;
   note?: string;
   createdBy?: string;
@@ -341,15 +355,16 @@ export async function addStockMovement(data: {
       [quantityAfter, data.productId]
     );
 
-    // تسجيل الحركة
+    // تسجيل الحركة باستخدام الأعمدة الموجودة فقط
+    // نستخدم quantity للتغيير و notes للملاحظة، و unit_price
     const result = await client.query(
       `INSERT INTO stock_movements 
-      (product_id, store_id, variant_id, type, quantity_change, quantity_before, quantity_after, unit_price, note, created_by)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      (product_id, store_id, variant_id, type, quantity, unit_price, notes, created_by)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
       [
         data.productId, data.storeId, data.variantId || null,
-        data.type, data.quantityChange, quantityBefore, quantityAfter,
-        data.unitPrice || 0, data.note || null, data.createdBy || null
+        data.type, data.quantityChange, data.unitPrice || 0,
+        data.note || null, data.createdBy || null
       ]
     );
 
@@ -418,7 +433,7 @@ export async function addOrder(data: Omit<Order, 'id' | 'createdAt' | 'updatedAt
         [order.id, item.productId, item.productName, item.quantity, item.price]
       );
 
-      // تحديث المخزون مع تسجيل الحركة
+      // تحديث المخزون مع تسجيل حركة مبسطة
       const current = await client.query(
         'SELECT quantity FROM products WHERE id = $1 FOR UPDATE',
         [item.productId]
@@ -431,10 +446,11 @@ export async function addOrder(data: Omit<Order, 'id' | 'createdAt' | 'updatedAt
         [after, item.productId]
       );
 
+      // إدراج حركة مخزون مبسطة باستخدام الأعمدة الموجودة
       await client.query(
-        `INSERT INTO stock_movements (product_id, store_id, type, quantity_change, quantity_before, quantity_after, unit_price, note)
-         VALUES ($1,$2,'sale',$3,$4,$5,$6,$7)`,
-        [item.productId, data.storeId, -item.quantity, before, after, item.price, `طلب #${order.id.slice(0, 8)}`]
+        `INSERT INTO stock_movements (product_id, store_id, type, quantity, unit_price, notes)
+         VALUES ($1,$2,'sale',$3,$4,$5)`,
+        [item.productId, data.storeId, -item.quantity, item.price, `طلب #${order.id.slice(0, 8)}`]
       );
     }
 
@@ -566,17 +582,18 @@ function mapProduct(row: any): Product {
 }
 
 function mapStockMovement(row: any): StockMovement {
+  // استخدام الأعمدة الموجودة: quantity للتغيير، notes للملاحظة
   return {
     id: row.id,
     productId: row.product_id ?? row.productId,
     storeId: row.store_id ?? row.storeId,
     variantId: row.variant_id ?? row.variantId ?? undefined,
     type: row.type,
-    quantityChange: row.quantity_change ?? row.quantityChange,
-    quantityBefore: row.quantity_before ?? row.quantityBefore ?? 0,
-    quantityAfter: row.quantity_after ?? row.quantityAfter ?? 0,
+    quantityChange: row.quantity ?? row.quantityChange ?? 0,   // استخدم quantity كتغيير
+    quantityBefore: row.quantity_before ?? row.quantityBefore ?? 0,  // غير متوفر، نضع 0 مؤقتاً
+    quantityAfter: row.quantity_after ?? row.quantityAfter ?? 0,      // غير متوفر
     unitPrice: row.unit_price ? parseFloat(row.unit_price) : 0,
-    note: row.note ?? undefined,
+    note: row.notes ?? row.note ?? undefined,
     createdBy: row.created_by ?? undefined,
     createdAt: row.created_at ?? row.createdAt,
   };
