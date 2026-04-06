@@ -17,6 +17,11 @@ export default function Suppliers() {
   const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
   const [search, setSearch] = useState('');
 
+  const safeToFixed = (value: any, digits: number = 0): string => {
+  const num = Number(value);
+  if (isNaN(num)) return '0';
+  return num.toFixed(digits);
+};
   // تحميل الموردين
   useEffect(() => {
     let isMounted = true;
