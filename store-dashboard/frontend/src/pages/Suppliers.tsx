@@ -20,6 +20,10 @@ export default function Suppliers() {
   const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
   const [search, setSearch] = useState('');
 
+  useEffect(() => {
+  console.log('Suppliers MOUNTED');
+  return () => console.log('Suppliers UNMOUNTED');
+}, []);
   const normalize = (arr: any[]) =>
     (Array.isArray(arr) ? arr : []).map(s => ({
       ...s,
