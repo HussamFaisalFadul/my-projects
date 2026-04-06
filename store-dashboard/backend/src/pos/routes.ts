@@ -104,7 +104,7 @@ router.get('/sessions/:id/summary', requireStore, async (req: any, res: Response
 
 // ===== الفواتير =====
 
-// إنشاء فاتورة جديدة
+// إنشاء فاتورة جديدة (مع تسجيل حركات المخزون)
 router.post('/invoices', requireStore, async (req: any, res: Response) => {
   const client = await pool.connect();
   try {
@@ -136,7 +136,7 @@ router.post('/invoices', requireStore, async (req: any, res: Response) => {
     );
     const invoice = invoiceResult.rows[0];
 
-    // إضافة العناصر وتحديث المخزون
+    // ===== الكود الجديد — يسجل حركة بيع لكل منتج =====
     for (const item of items) {
       await client.query(
         `INSERT INTO pos_invoice_items
@@ -149,11 +149,36 @@ router.post('/invoices', requireStore, async (req: any, res: Response) => {
         ]
       );
 
-      // تحديث المخزون
       if (item.productId) {
+        // نجلب الكمية الحالية قبل النقص
+        const before = await client.query(
+          `SELECT quantity FROM products WHERE id = $1 FOR UPDATE`,
+          [item.productId]
+        );
+        const quantityBefore = before.rows[0]?.quantity ?? 0;
+        const quantityAfter = Math.max(0, quantityBefore - item.quantity);
+
+        // نقص المخزون
         await client.query(
-          `UPDATE products SET quantity = GREATEST(0, quantity - $1) WHERE id = $2`,
-          [item.quantity, item.productId]
+          `UPDATE products SET quantity = $1 WHERE id = $2`,
+          [quantityAfter, item.productId]
+        );
+
+        // تسجيل حركة البيع
+        await client.query(
+          `INSERT INTO stock_movements
+            (product_id, store_id, type, quantity_change, quantity_before, quantity_after, unit_price, note, created_by)
+           VALUES ($1, $2, 'sale', $3, $4, $5, $6, $7, $8)`,
+          [
+            item.productId,
+            req.storeId,
+            -item.quantity,
+            quantityBefore,
+            quantityAfter,
+            item.unitPrice,
+            `فاتورة كاشير #${invoice.id.slice(0, 8)}`,
+            req.user.id,
+          ]
         );
       }
     }
@@ -211,7 +236,7 @@ router.get('/sessions/:id/invoices', requireStore, async (req: any, res: Respons
   }
 });
 
-// إلغاء فاتورة وإرجاع المخزون
+// إلغاء فاتورة وإرجاع المخزون (مع تسجيل حركة استرداد)
 router.put('/invoices/:id/refund', requireStore, async (req: any, res: Response) => {
   const client = await pool.connect();
   try {
@@ -224,16 +249,40 @@ router.put('/invoices/:id/refund', requireStore, async (req: any, res: Response)
     );
     if (!invoice.rows[0]) return res.status(404).json({ error: 'الفاتورة غير موجودة' });
 
-    // إرجاع المخزون
+    // جلب عناصر الفاتورة
     const items = await client.query(
       `SELECT * FROM pos_invoice_items WHERE invoice_id = $1`,
       [req.params.id]
     );
+
+    // ===== الكود الجديد — يسجل حركة استرداد =====
     for (const item of items.rows) {
       if (item.product_id) {
+        const before = await client.query(
+          `SELECT quantity FROM products WHERE id = $1 FOR UPDATE`,
+          [item.product_id]
+        );
+        const quantityBefore = before.rows[0]?.quantity ?? 0;
+        const quantityAfter = quantityBefore + item.quantity;
+
         await client.query(
-          `UPDATE products SET quantity = quantity + $1 WHERE id = $2`,
-          [item.quantity, item.product_id]
+          `UPDATE products SET quantity = $1 WHERE id = $2`,
+          [quantityAfter, item.product_id]
+        );
+
+        await client.query(
+          `INSERT INTO stock_movements
+            (product_id, store_id, type, quantity_change, quantity_before, quantity_after, note, created_by)
+           VALUES ($1, $2, 'return', $3, $4, $5, $6, $7)`,
+          [
+            item.product_id,
+            req.storeId,
+            item.quantity,
+            quantityBefore,
+            quantityAfter,
+            `استرداد فاتورة #${req.params.id.slice(0, 8)}`,
+            req.user.id,
+          ]
         );
       }
     }
