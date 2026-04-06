@@ -1,7 +1,7 @@
 import pool from './connection';
 import { Product, Order, Notification } from '../types';
 
-// ===== المنتجات (نسخة مبسطة) =====
+// ===== المنتجات =====
 
 export async function getProducts(storeId: string): Promise<Product[]> {
   const result = await pool.query(
@@ -17,7 +17,6 @@ export async function getProductById(id: string): Promise<Product | null> {
 }
 
 export async function addProduct(data: any): Promise<Product> {
-  // فقط الحقول الأساسية: الاسم، السعر، المخزون، المتجر، وأي حقول إضافية إذا أرسلها المستخدم
   const result = await pool.query(
     `INSERT INTO products 
       (store_id, name, price, quantity, category, min_quantity, image_url,
@@ -89,7 +88,7 @@ export async function deleteProduct(id: string): Promise<boolean> {
   return (result.rowCount ?? 0) > 0;
 }
 
-// ===== الطلبات (تبسيط) =====
+// ===== الطلبات =====
 
 export async function getOrders(storeId: string): Promise<Order[]> {
   const ordersResult = await pool.query(
@@ -136,7 +135,6 @@ export async function addOrder(data: Omit<Order, 'id' | 'createdAt' | 'updatedAt
         [order.id, item.productId, item.productName, item.quantity, item.price]
       );
 
-      // تحديث المخزون
       await client.query(
         `UPDATE products SET quantity = GREATEST(0, quantity - $1) WHERE id = $2`,
         [item.quantity, item.productId]
@@ -171,7 +169,7 @@ export async function updateOrderStatus(id: string, status: Order['status']): Pr
   };
 }
 
-// ===== الإحصائيات والتنبيهات (تبسيط) =====
+// ===== الإحصائيات =====
 
 export async function getStats(storeId: string) {
   const today = new Date();
@@ -207,6 +205,8 @@ export async function getStats(storeId: string) {
   };
 }
 
+// ===== التنبيهات =====
+
 export async function getNotifications(storeId: string): Promise<Notification[]> {
   const result = await pool.query(
     'SELECT * FROM notifications WHERE store_id = $1 ORDER BY created_at DESC LIMIT 50',
@@ -238,8 +238,8 @@ function mapProduct(row: any): Product {
     name: row.name,
     price: parseFloat(row.price),
     quantity: row.quantity,
-    category: row.category,
-    minQuantity: row.min_quantity,
+    category: row.category || '',
+    minQuantity: row.min_quantity || 5,
     imageUrl: row.image_url ?? undefined,
     sku: row.sku ?? undefined,
     barcode: row.barcode ?? undefined,
@@ -290,3 +290,13 @@ function mapNotification(row: any): Notification {
     createdAt: row.created_at,
   };
 }
+
+// تصدير دوال إضافية للتوافق مع `index.ts` (قد لا تستخدمها الآن)
+export const getStockMovements = async () => [];
+export const addStockMovement = async () => ({});
+export const addProductImage = async () => ({});
+export const getProductImages = async () => [];
+export const deleteProductImage = async () => {};
+export const addProductVariant = async () => ({});
+export const getProductVariants = async () => [];
+export const deleteProductVariant = async () => {};
