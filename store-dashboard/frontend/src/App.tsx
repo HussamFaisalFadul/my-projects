@@ -241,14 +241,7 @@ export default function App() {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="loading-screen">
-        <div className="loading-spinner"></div>
-        <p>جاري تحميل لوحة التحكم...</p>
-      </div>
-    );
-  }
+  
 
   return (
     <div className="app" dir="rtl">
