@@ -756,11 +756,20 @@ export default function Products() {
             <div className="modal-body">
               <table className="movements-table">
                 <thead>
-                  <tr><th>التاريخ</th><th>التغيير</th><th>قبل</th><th>بعد</th><th>النوع</th><th>ملاحظة</th></tr>
+                  <tr>
+                    <th>التاريخ</th>
+                    <th>التغيير</th>
+                    <th>قبل</th>
+                    <th>بعد</th>
+                    <th>النوع</th>
+                    <th>ملاحظة</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {movementsData.length === 0 && (
-                    <tr><td colSpan={6} style={{ textAlign: 'center', color: '#6b7280' }}>لا توجد حركات مسجلة</td>)
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', color: '#6b7280' }}>لا توجد حركات مسجلة</td>
+                    </tr>
                   )}
                   {movementsData.map((m: any) => (
                     <tr key={m.id}>
@@ -770,7 +779,7 @@ export default function Products() {
                       <td>{m.quantityAfter}</td>
                       <td>{m.type}</td>
                       <td>{m.note || '—'}</td>
-                    </table>
+                    </tr>
                   ))}
                 </tbody>
               </table>
