@@ -328,25 +328,21 @@ export async function addStockMovement(data: {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-
-    // تحديث كمية المنتج
     await client.query(
       'UPDATE products SET quantity = $1, updated_at = NOW() WHERE id = $2',
       [data.quantityAfter, data.productId]
     );
-
-    // إدراج الحركة
     const result = await client.query(
       `INSERT INTO stock_movements 
-      (product_id, store_id, variant_id, type, quantity_change, quantity_before, quantity_after, unit_price, note, created_by)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      (product_id, store_id, variant_id, type, quantity, quantity_change, quantity_before, quantity_after, unit_price, note, created_by)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
       [
         data.productId, data.storeId, data.variantId || null,
-        data.type, data.quantityChange, data.quantityBefore, data.quantityAfter,
+        data.type, Math.abs(data.quantityChange),
+        data.quantityChange, data.quantityBefore, data.quantityAfter,
         data.unitPrice || 0, data.note || null, data.createdBy || null
       ]
     );
-
     await client.query('COMMIT');
     return result.rows[0];
   } catch (err) {
