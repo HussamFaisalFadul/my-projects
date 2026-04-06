@@ -226,30 +226,8 @@ app.post('/api/orders', authMiddleware, requireStore, async (req: any, res) => {
     const n = await addNotification(req.storeId, 'طلب_جديد', `طلب جديد من ${order.customerName} — ${order.totalPrice} ريال`);
     io.to(req.storeId).emit('notification', n);
 
-    const products = await getProducts(req.storeId);
-    for (const item of order.items) {
-      const product = products.find(p => p.id === item.productId);
-      if (product) {
-        const quantityBefore = product.quantity + item.quantity;
-        await addStockMovement({
-          productId: item.productId,
-          storeId: req.storeId,
-          type: 'sale',
-          quantityChange: -item.quantity,
-          quantityBefore: quantityBefore,
-          quantityAfter: product.quantity,
-          unitPrice: item.price,
-          note: `طلب #${order.id.slice(0, 8)}`,
-          createdBy: req.user.id,
-        });
-        io.to(req.storeId).emit('product_updated', product);
-        const aiMsg = analyzeInventory(product);
-        if (aiMsg) {
-          const an = await addNotification(req.storeId, 'تحذير_مخزون', aiMsg);
-          io.to(req.storeId).emit('notification', an);
-        }
-      }
-    }
+    // تم إزالة الحلقة التي كانت تسجل حركات المخزون مرة أخرى
+    // لأن addOrder في queries.ts تقوم بذلك بالفعل داخل transaction
 
     res.status(201).json(order);
   } catch (err: any) { res.status(500).json({ error: err.message }); }
