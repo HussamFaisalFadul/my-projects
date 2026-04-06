@@ -8,32 +8,43 @@ export default function Suppliers() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', phone: '', email: '', address: '', notes: '' });
   const [saving, setSaving] = useState(false);
-  const [selectedSupplier, setSelectedSupplier] = useState<(Supplier & { products?: any[] }) | null>(null);
+  const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
   const [search, setSearch] = useState('');
 
-  // تحميل الموردين مرة واحدة فقط عند تحميل الصفحة
+  // تحميل الموردين مع رسائل تصحيح
   useEffect(() => {
     let isMounted = true;
     const loadSuppliers = async () => {
+      console.log('🔄 بدء تحميل الموردين...');
       setLoading(true);
       try {
         const data = await api.getSuppliers();
-        if (isMounted) setSuppliers(Array.isArray(data) ? data : []);
+        console.log('✅ البيانات المستلمة من API:', data);
+        if (isMounted) {
+          if (Array.isArray(data)) {
+            setSuppliers(data);
+            console.log(`📦 تم تعيين ${data.length} مورد`);
+          } else {
+            console.error('البيانات المستلمة ليست مصفوفة:', data);
+            setSuppliers([]);
+          }
+        }
       } catch (err) {
-        console.error('فشل تحميل الموردين', err);
+        console.error('❌ خطأ في جلب الموردين:', err);
+        if (isMounted) setSuppliers([]);
       } finally {
         if (isMounted) setLoading(false);
       }
     };
     loadSuppliers();
     return () => { isMounted = false; };
-  }, []); // ← لا توجد تبعيات، يتم التشغيل مرة واحدة
+  }, []); // يعمل مرة واحدة فقط
 
   const loadSupplierDetails = async (id: string) => {
     try {
       const token = localStorage.getItem('store_token');
       const storeId = localStorage.getItem('store_id');
-      const res = await fetch(`${api.BACKEND_URL}/suppliers/${id}`, {
+      const res = await fetch(`${api.BACKEND_URL || 'https://store-dashboard-backend.onrender.com'}/suppliers/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'x-store-id': storeId || '',
