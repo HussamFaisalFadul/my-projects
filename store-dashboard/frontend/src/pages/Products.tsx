@@ -379,7 +379,7 @@ export default function Products() {
         isActive: form.is_active,
         tags: form.tagsText.split(',').map(t => t.trim()).filter(Boolean),
         status: form.is_active ? 'published' : 'draft',
-        supplierId: form.supplierId || null, // إرسال المورد
+        supplierId: form.supplierId || undefined, // ← تم التغيير من null إلى undefined
         images: finalImages.map(img => ({
           id: img.id,
           productId: '',
