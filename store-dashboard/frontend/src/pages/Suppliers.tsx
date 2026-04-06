@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { api, Supplier } from '../api';
 
-// دالة مساعدة لتحويل أي قيمة إلى رقم آمن
 const toNumber = (value: any): number => {
   const num = Number(value);
   return isNaN(num) ? 0 : num;
+};
+
+const fmt = (value: any, digits = 0): string => {
+  return toNumber(value).toFixed(digits);
 };
 
 export default function Suppliers() {
@@ -17,30 +20,21 @@ export default function Suppliers() {
   const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
   const [search, setSearch] = useState('');
 
-  const safeToFixed = (value: any, digits: number = 0): string => {
-  const num = Number(value);
-  if (isNaN(num)) return '0';
-  return num.toFixed(digits);
-};
-  // تحميل الموردين
+  const normalize = (arr: any[]) =>
+    (Array.isArray(arr) ? arr : []).map(s => ({
+      ...s,
+      balance: toNumber(s.balance),
+      products_count: toNumber(s.products_count),
+      total_stock_value: toNumber(s.total_stock_value),
+    }));
+
   useEffect(() => {
     let isMounted = true;
     const loadSuppliers = async () => {
       setLoading(true);
       try {
         const data = await api.getSuppliers();
-          console.log('البيانات المستلمة:', data);
-          console.log('isMounted:', isMounted);
-            if (isMounted) {
-          // تحويل القيم الرقمية التي قد تكون نصوصاً
-          const normalized = (Array.isArray(data) ? data : []).map(s => ({
-            ...s,
-            balance: toNumber(s.balance),
-            products_count: toNumber(s.products_count),
-            total_stock_value: toNumber(s.total_stock_value),
-          }));
-          setSuppliers(normalized);
-        }
+        if (isMounted) setSuppliers(normalize(data));
       } catch (err) {
         console.error('فشل تحميل الموردين', err);
       } finally {
@@ -62,7 +56,6 @@ export default function Suppliers() {
         },
       });
       const data = await res.json();
-      // تحويل القيم الرقمية في التفاصيل أيضاً
       if (data) {
         data.balance = toNumber(data.balance);
         if (data.products) {
@@ -89,15 +82,8 @@ export default function Suppliers() {
       } else {
         await api.addSupplier(form);
       }
-      // إعادة تحميل القائمة
       const data = await api.getSuppliers();
-      const normalized = (Array.isArray(data) ? data : []).map(s => ({
-        ...s,
-        balance: toNumber(s.balance),
-        products_count: toNumber(s.products_count),
-        total_stock_value: toNumber(s.total_stock_value),
-      }));
-      setSuppliers(normalized);
+      setSuppliers(normalize(data));
       setShowForm(false);
       setEditingId(null);
       setForm({ name: '', phone: '', email: '', address: '', notes: '' });
@@ -139,10 +125,9 @@ export default function Suppliers() {
     (s.email || '').toLowerCase().includes(search.toLowerCase())
   );
 
-  // الآن أصبحت balance و total_stock_value أرقاماً مؤكدة
-  const totalBalance = suppliers.reduce((sum, s) => sum + (s.balance || 0), 0);
-  const totalProducts = suppliers.reduce((sum, s) => sum + (s.products_count || 0), 0);
-  const totalValue = suppliers.reduce((sum, s) => sum + (s.total_stock_value || 0), 0);
+  const totalBalance = toNumber(suppliers.reduce((sum, s) => sum + toNumber(s.balance), 0));
+  const totalProducts = toNumber(suppliers.reduce((sum, s) => sum + toNumber(s.products_count), 0));
+  const totalValue = toNumber(suppliers.reduce((sum, s) => sum + toNumber(s.total_stock_value), 0));
 
   if (loading) {
     return <div style={{ padding: 24, textAlign: 'center' }}>جاري التحميل...</div>;
@@ -166,26 +151,18 @@ export default function Suppliers() {
 
       {/* إحصائيات سريعة */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 24 }}>
-        <div style={{ background: 'white', borderRadius: 16, padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
-          <div style={{ fontSize: 24, marginBottom: 8 }}>🏭</div>
-          <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>عدد الموردين</div>
-          <div style={{ fontSize: 22, fontWeight: 700 }}>{suppliers.length}</div>
-        </div>
-        <div style={{ background: 'white', borderRadius: 16, padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
-          <div style={{ fontSize: 24, marginBottom: 8 }}>📦</div>
-          <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>إجمالي المنتجات</div>
-          <div style={{ fontSize: 22, fontWeight: 700 }}>{totalProducts}</div>
-        </div>
-        <div style={{ background: 'white', borderRadius: 16, padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
-          <div style={{ fontSize: 24, marginBottom: 8 }}>💰</div>
-          <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>قيمة المخزون</div>
-          <div style={{ fontSize: 22, fontWeight: 700 }}>{totalValue.toFixed(0)} ر.س</div>
-        </div>
-        <div style={{ background: 'white', borderRadius: 16, padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
-          <div style={{ fontSize: 24, marginBottom: 8 }}>💳</div>
-          <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>الرصيد المستحق</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: totalBalance > 0 ? '#dc2626' : '#059669' }}>{totalBalance.toFixed(0)} ر.س</div>
-        </div>
+        {[
+          { icon: '🏭', label: 'عدد الموردين', value: suppliers.length, unit: '' },
+          { icon: '📦', label: 'إجمالي المنتجات', value: totalProducts, unit: '' },
+          { icon: '💰', label: 'قيمة المخزون', value: fmt(totalValue), unit: ' ر.س' },
+          { icon: '💳', label: 'الرصيد المستحق', value: fmt(totalBalance), unit: ' ر.س', color: totalBalance > 0 ? '#dc2626' : '#059669' },
+        ].map((card, i) => (
+          <div key={i} style={{ background: 'white', borderRadius: 16, padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: 24, marginBottom: 8 }}>{card.icon}</div>
+            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>{card.label}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: card.color }}>{card.value}{card.unit}</div>
+          </div>
+        ))}
       </div>
 
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
@@ -217,14 +194,14 @@ export default function Suppliers() {
                     </div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                       <span style={{ background: '#eff6ff', color: '#2563eb', padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
-                        {supplier.products_count || 0} منتج
+                        {toNumber(supplier.products_count)} منتج
                       </span>
                       <span style={{ background: '#f0fdf4', color: '#059669', padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
-                        {toNumber(supplier.total_stock_value).toFixed(0)} ر.س قيمة
+                        {fmt(supplier.total_stock_value)} ر.س قيمة
                       </span>
-                      {supplier.balance > 0 && (
+                      {toNumber(supplier.balance) > 0 && (
                         <span style={{ background: '#fee2e2', color: '#dc2626', padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
-                          {toNumber(supplier.balance).toFixed(0)} ر.س مستحق
+                          {fmt(supplier.balance)} ر.س مستحق
                         </span>
                       )}
                     </div>
@@ -233,20 +210,16 @@ export default function Suppliers() {
                     <button
                       onClick={e => { e.stopPropagation(); handleEdit(supplier); }}
                       style={{ padding: '6px 12px', background: '#eff6ff', color: '#2563eb', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}
-                    >
-                      تعديل
-                    </button>
+                    >تعديل</button>
                     <button
                       onClick={e => { e.stopPropagation(); handleDelete(supplier.id); }}
                       style={{ padding: '6px 12px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}
-                    >
-                      حذف
-                    </button>
+                    >حذف</button>
                   </div>
                 </div>
               </div>
             ))}
-            {filtered.length === 0 && !loading && (
+            {filtered.length === 0 && (
               <div style={{ textAlign: 'center', padding: 40, background: 'white', borderRadius: 16, color: '#94a3b8' }}>
                 <div style={{ fontSize: 48, marginBottom: 12 }}>🏭</div>
                 <p>لا يوجد موردون بعد</p>
@@ -269,30 +242,32 @@ export default function Suppliers() {
               {selectedSupplier.notes && <div style={{ background: '#f8fafc', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#475569' }}>📝 {selectedSupplier.notes}</div>}
             </div>
             <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#64748b', marginBottom: 10 }}>المنتجات المرتبطة ({selectedSupplier.products?.length || 0})</div>
-              {selectedSupplier.products?.length === 0 ? (
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#64748b', marginBottom: 10 }}>
+                المنتجات المرتبطة ({selectedSupplier.products?.length || 0})
+              </div>
+              {!selectedSupplier.products?.length ? (
                 <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: '12px 0' }}>لا توجد منتجات مرتبطة</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 300, overflow: 'auto' }}>
-                  {selectedSupplier.products?.map((p: any) => (
+                  {selectedSupplier.products.map((p: any) => (
                     <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: '#f8fafc', borderRadius: 8 }}>
                       <div>
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
                         <div style={{ fontSize: 11, color: '#94a3b8' }}>{p.category} | متبقي: {toNumber(p.quantity)}</div>
                       </div>
                       <div style={{ textAlign: 'left' }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#2563eb' }}>{toNumber(p.price).toFixed(2)} ر.س</div>
-                        {p.cost_price && <div style={{ fontSize: 11, color: '#64748b' }}>تكلفة: {toNumber(p.cost_price).toFixed(2)}</div>}
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#2563eb' }}>{fmt(p.price, 2)} ر.س</div>
+                        {toNumber(p.cost_price) > 0 && <div style={{ fontSize: 11, color: '#64748b' }}>تكلفة: {fmt(p.cost_price, 2)}</div>}
                       </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-            {selectedSupplier.balance > 0 && (
+            {toNumber(selectedSupplier.balance) > 0 && (
               <div style={{ background: '#fee2e2', borderRadius: 10, padding: '12px', textAlign: 'center', marginTop: 16 }}>
                 <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 4 }}>الرصيد المستحق</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#dc2626' }}>{toNumber(selectedSupplier.balance).toFixed(0)} ر.س</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#dc2626' }}>{fmt(selectedSupplier.balance)} ر.س</div>
               </div>
             )}
           </div>
@@ -308,32 +283,43 @@ export default function Suppliers() {
               <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: '#94a3b8' }}>✕</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
-                <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>اسم المورد *</label>
-                <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="مثال: شركة الأمل للتوريد" style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>رقم الجوال</label>
-                <input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="05xxxxxxxx" style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>البريد الإلكتروني</label>
-                <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="supplier@email.com" style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>العنوان</label>
-                <input type="text" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="المدينة، الحي..." style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }} />
-              </div>
+              {[
+                { label: 'اسم المورد *', key: 'name', type: 'text', placeholder: 'مثال: شركة الأمل للتوريد' },
+                { label: 'رقم الجوال', key: 'phone', type: 'tel', placeholder: '05xxxxxxxx' },
+                { label: 'البريد الإلكتروني', key: 'email', type: 'email', placeholder: 'supplier@email.com' },
+                { label: 'العنوان', key: 'address', type: 'text', placeholder: 'المدينة، الحي...' },
+              ].map(field => (
+                <div key={field.key}>
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>{field.label}</label>
+                  <input
+                    type={field.type}
+                    value={(form as any)[field.key]}
+                    onChange={e => setForm({ ...form, [field.key]: e.target.value })}
+                    placeholder={field.placeholder}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #e2e8f0', boxSizing: 'border-box', fontFamily: 'Tajawal, sans-serif' }}
+                  />
+                </div>
+              ))}
               <div>
                 <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>ملاحظات</label>
-                <textarea rows={3} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="أي ملاحظات إضافية..." style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #e2e8f0', resize: 'vertical' }} />
+                <textarea
+                  rows={3}
+                  value={form.notes}
+                  onChange={e => setForm({ ...form, notes: e.target.value })}
+                  placeholder="أي ملاحظات إضافية..."
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #e2e8f0', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'Tajawal, sans-serif' }}
+                />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-              <button onClick={handleSave} disabled={saving || !form.name.trim()} style={{ flex: 1, padding: '13px', background: 'linear-gradient(135deg, #2563eb, #7c3aed)', color: 'white', border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 700, opacity: (saving || !form.name.trim()) ? 0.7 : 1 }}>
+              <button
+                onClick={handleSave}
+                disabled={saving || !form.name.trim()}
+                style={{ flex: 1, padding: '13px', background: 'linear-gradient(135deg, #2563eb, #7c3aed)', color: 'white', border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontFamily: 'Tajawal, sans-serif', opacity: (saving || !form.name.trim()) ? 0.7 : 1 }}
+              >
                 {saving ? 'جاري الحفظ...' : editingId ? 'حفظ التعديلات' : 'إضافة المورد'}
               </button>
-              <button onClick={() => setShowForm(false)} style={{ padding: '13px 20px', background: '#f1f5f9', border: 'none', borderRadius: 10, cursor: 'pointer' }}>إلغاء</button>
+              <button onClick={() => setShowForm(false)} style={{ padding: '13px 20px', background: '#f1f5f9', border: 'none', borderRadius: 10, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>إلغاء</button>
             </div>
           </div>
         </div>
