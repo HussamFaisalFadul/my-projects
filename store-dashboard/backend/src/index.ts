@@ -7,6 +7,7 @@ import passport from 'passport';
 import authRouter from './auth/routes';
 import storesRouter from './stores/routes';
 import posRouter from './pos/routes';
+import suppliersRouter from './suppliers/routes';
 import { authMiddleware } from './auth/auth';
 import {
   getProducts,
@@ -48,6 +49,7 @@ app.use(passport.initialize());
 app.use('/auth', authRouter);
 app.use('/stores', storesRouter);
 app.use('/pos', posRouter);
+app.use('/suppliers', suppliersRouter);
 // ===== ميدلوير التحقق من المتجر =====
 async function requireStore(req: any, res: any, next: any) {
   const storeId = req.headers['x-store-id'] as string;
