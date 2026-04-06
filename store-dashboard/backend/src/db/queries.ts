@@ -317,7 +317,7 @@ export async function addStockMovement(data: {
   productId: string;
   storeId: string;
   variantId?: string;
-  type: 'توريد' | 'بيع' | 'تعديل_يدوي' | 'إرجاع' | 'خسارة';
+  type: 'purchase' | 'sale' | 'return' | 'adjustment' | 'damage';
   quantityChange: number;
   quantityBefore: number;
   quantityAfter: number;
