@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const BACKEND = 'https://store-dashboard-backend.onrender.com';
 
@@ -11,6 +12,7 @@ interface InviteInfo {
 }
 
 export default function JoinPage() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<'loading' | 'info' | 'wrong_email' | 'success' | 'error'>('loading');
   const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
   const [message, setMessage] = useState('');
@@ -21,7 +23,7 @@ export default function JoinPage() {
   const currentUser = JSON.parse(localStorage.getItem('store_user') || 'null');
 
   useEffect(() => {
-    if (!token) { setStatus('error'); setMessage('رابط غير صحيح'); return; }
+    if (!token) { setStatus('error'); setMessage(t('join.invalidLink')); return; }
 
     // جلب تفاصيل الدعوة أولاً
     fetch(`${BACKEND}/stores/join/${token}`)
@@ -45,8 +47,8 @@ export default function JoinPage() {
 
         setStatus('info');
       })
-      .catch(() => { setStatus('error'); setMessage('تعذر الاتصال بالخادم'); });
-  }, []);
+      .catch(() => { setStatus('error'); setMessage(t('join.connectionError')); });
+  }, [t]);
 
   const handleAccept = async () => {
     if (!authToken) {
@@ -69,13 +71,13 @@ export default function JoinPage() {
         localStorage.setItem('store_name', data.storeName);
         localStorage.removeItem('pending_join_token');
         setStatus('success');
-        setMessage(`تم انضمامك لـ "${data.storeName}" كـ ${data.role} 🎉`);
+        setMessage(t('join.acceptSuccess', { storeName: data.storeName, role: data.role }));
         setTimeout(() => { window.location.href = '/'; }, 2000);
       } else {
         setStatus('error');
-        setMessage(data.error || 'فشل قبول الدعوة');
+        setMessage(data.error || t('join.acceptFailed'));
       }
-    } catch { setStatus('error'); setMessage('تعذر الاتصال بالخادم'); }
+    } catch { setStatus('error'); setMessage(t('join.connectionError')); }
     setAccepting(false);
   };
 
@@ -98,40 +100,40 @@ export default function JoinPage() {
         {status === 'loading' && (
           <>
             <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
-            <h2>جاري التحقق من الدعوة...</h2>
+            <h2>{t('join.verifying')}</h2>
           </>
         )}
 
         {status === 'info' && inviteInfo && (
           <>
             <div style={{ fontSize: 56, marginBottom: 16 }}>🎉</div>
-            <h2 style={{ marginBottom: 8 }}>دعوة للانضمام</h2>
+            <h2 style={{ marginBottom: 8 }}>{t('join.inviteTitle')}</h2>
             <p style={{ color: '#888', marginBottom: 20 }}>
-              تمت دعوتك للانضمام لـ
+              {t('join.inviteDescription')}
             </p>
             <div style={{ background: '#f0f4ff', borderRadius: 12, padding: '16px', marginBottom: 20 }}>
               <div style={{ fontSize: 22, fontWeight: 700 }}>🏪 {inviteInfo.storeName}</div>
-              <div style={{ marginTop: 8, color: '#2563eb', fontWeight: 600 }}>كـ {inviteInfo.role}</div>
-              <div style={{ marginTop: 4, fontSize: 12, color: '#888' }}>لـ {inviteInfo.email}</div>
+              <div style={{ marginTop: 8, color: '#2563eb', fontWeight: 600 }}>{t('join.asRole', { role: inviteInfo.role })}</div>
+              <div style={{ marginTop: 4, fontSize: 12, color: '#888' }}>{t('join.forEmail', { email: inviteInfo.email })}</div>
             </div>
 
             {!authToken ? (
               <>
-                <p style={{ color: '#f59e0b', fontSize: 14, marginBottom: 12 }}>⚠️ يجب تسجيل الدخول بإيميل {inviteInfo.email} أولاً</p>
+                <p style={{ color: '#f59e0b', fontSize: 14, marginBottom: 12 }}>{t('join.loginRequired', { email: inviteInfo.email })}</p>
                 <button style={styles.btn} onClick={handleLoginFirst}>
-                  تسجيل الدخول للمتابعة
+                  {t('join.loginToProceed')}
                 </button>
               </>
             ) : (
               <>
                 <p style={{ color: '#888', fontSize: 13, marginBottom: 4 }}>
-                  حسابك الحالي: <strong>{currentUser?.email}</strong>
+                  {t('join.currentAccount')} <strong>{currentUser?.email}</strong>
                 </p>
                 <button style={styles.btn} onClick={handleAccept} disabled={accepting}>
-                  {accepting ? 'جاري القبول...' : '✅ قبول الدعوة'}
+                  {accepting ? t('common.loading') : t('join.accept')}
                 </button>
                 <button style={styles.btnOutline} onClick={() => window.location.href = '/'}>
-                  رفض
+                  {t('join.decline')}
                 </button>
               </>
             )}
@@ -141,12 +143,12 @@ export default function JoinPage() {
         {status === 'wrong_email' && inviteInfo && (
           <>
             <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-            <h2 style={{ color: '#f59e0b', marginBottom: 8 }}>إيميل غير مطابق</h2>
+            <h2 style={{ color: '#f59e0b', marginBottom: 8 }}>{t('join.emailMismatch')}</h2>
             <p style={{ color: '#666', marginBottom: 16 }}>
-              هذه الدعوة مخصصة لـ <strong>{inviteInfo.email}</strong>
+              {t('join.emailMismatchDesc', { email: inviteInfo.email })}
             </p>
             <p style={{ color: '#888', fontSize: 14, marginBottom: 20 }}>
-              أنت مسجل بـ <strong>{currentUser?.email}</strong>
+              {t('join.currentAccountEmail', { email: currentUser?.email })}
             </p>
             <button style={styles.btn} onClick={() => {
               localStorage.removeItem('store_token');
@@ -156,10 +158,10 @@ export default function JoinPage() {
               localStorage.setItem('pending_join_token', token);
               window.location.href = '/';
             }}>
-              تسجيل الخروج والدخول بالإيميل الصحيح
+              {t('join.logoutAndLogin')}
             </button>
             <button style={styles.btnOutline} onClick={() => window.location.href = '/'}>
-              العودة لمتجري
+              {t('join.backToStore')}
             </button>
           </>
         )}
@@ -168,7 +170,7 @@ export default function JoinPage() {
           <>
             <div style={{ fontSize: 56, marginBottom: 16 }}>🎊</div>
             <h2 style={{ color: '#059669' }}>{message}</h2>
-            <p style={{ color: '#888', marginTop: 8 }}>جاري التوجيه...</p>
+            <p style={{ color: '#888', marginTop: 8 }}>{t('join.redirecting')}</p>
           </>
         )}
 
@@ -177,7 +179,7 @@ export default function JoinPage() {
             <div style={{ fontSize: 48, marginBottom: 16 }}>❌</div>
             <h2 style={{ color: '#dc2626', marginBottom: 16 }}>{message}</h2>
             <button style={styles.btn} onClick={() => window.location.href = '/'}>
-              العودة للرئيسية
+              {t('join.backToHome')}
             </button>
           </>
         )}
