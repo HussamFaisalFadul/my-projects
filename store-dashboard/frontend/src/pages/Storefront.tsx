@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import './Storefront.css'; // يمكنك إنشاء ملف CSS خاص
 
 const BACKEND = 'https://store-dashboard-backend.onrender.com';
 
@@ -23,6 +22,7 @@ interface Store {
   name: string;
   description: string;
   logo_url: string;
+  owner_phone?: string;
   products: Product[];
 }
 
@@ -38,7 +38,6 @@ export default function Storefront() {
   const [orderStatus, setOrderStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [whatsappLink, setWhatsappLink] = useState('');
 
-  // تحميل بيانات المتجر
   useEffect(() => {
     fetch(`${BACKEND}/api/public/stores/${slug}`)
       .then(res => res.json())
@@ -50,13 +49,11 @@ export default function Storefront() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // تحميل السلة من localStorage
   useEffect(() => {
     const savedCart = localStorage.getItem(`cart_${slug}`);
     if (savedCart) setCart(JSON.parse(savedCart));
   }, [slug]);
 
-  // حفظ السلة في localStorage عند التغيير
   useEffect(() => {
     localStorage.setItem(`cart_${slug}`, JSON.stringify(cart));
   }, [cart, slug]);
@@ -115,7 +112,9 @@ export default function Storefront() {
       if (data.success) {
         setOrderStatus('success');
         const message = `مرحباً، أود طلب:\n${cart.map(i => `${i.name} × ${i.cartQuantity} = ${i.price * i.cartQuantity} ريال`).join('\n')}\nالإجمالي: ${totalPrice} ريال\nالاسم: ${customerName}\nالجوال: ${customerPhone}\nملاحظات: ${notes || 'لا توجد'}`;
-        setWhatsappLink(`https://wa.me/${store!.owner_phone || ''}?text=${encodeURIComponent(message)}`);
+        // استخدم رقم هاتف المتجر إذا وجد، وإلا استخدم رقم افتراضي أو اتركه فارغاً
+        const phone = store?.owner_phone || '';
+        setWhatsappLink(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
         setCart([]);
         localStorage.removeItem(`cart_${slug}`);
       } else {
