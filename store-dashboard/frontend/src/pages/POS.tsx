@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const BACKEND = 'https://store-dashboard-backend.onrender.com';
 
@@ -58,6 +59,7 @@ interface Invoice {
 type PaymentMethod = 'cash' | 'card' | 'transfer' | 'split';
 
 export default function POS() {
+  const { t } = useTranslation();
   const [session, setSession] = useState<Session | null>(null);
   const [loadingSession, setLoadingSession] = useState(true);
   const [openingCash, setOpeningCash] = useState('');
@@ -166,10 +168,9 @@ export default function POS() {
     searchTimeout.current = setTimeout(() => searchProducts(value), 300);
   };
 
-  // ===== إضافة منتج إلى السلة مع معالجة الأرقام =====
   const addToCart = (product: Product) => {
     if (!product || !product.id || !product.name || product.price === undefined) {
-      console.error('منتج غير صالح:', product);
+      console.error(t('pos.invalidProduct'), product);
       return;
     }
     setCart(prev => {
@@ -204,7 +205,6 @@ export default function POS() {
     searchRef.current?.focus();
   };
 
-  // ===== تحديث عنصر في السلة =====
   const updateCartItem = (index: number, field: 'quantity' | 'discount' | 'unitPrice', value: number) => {
     setCart(prev =>
       prev.map((item, i) => {
@@ -220,7 +220,6 @@ export default function POS() {
     setCart(prev => prev.filter((_, i) => i !== index));
   };
 
-  // ===== الحسابات =====
   const subtotal = cart.reduce((sum, i) => sum + toNumber(i.quantity) * toNumber(i.unitPrice), 0);
   const cartDiscount = cart.reduce((sum, i) => sum + toNumber(i.discount), 0);
   const discountAmount = discountType === 'percent'
@@ -232,12 +231,11 @@ export default function POS() {
   const paid = toNumber(paidAmount);
   const change = Math.max(0, paid - total);
 
-  // ===== إنشاء الفاتورة =====
   const checkout = async () => {
     if (cart.length === 0) return;
-    if (!session) { alert('افتح جلسة أولاً'); return; }
+    if (!session) { alert(t('pos.openSessionFirst')); return; }
     if (paymentMethod === 'cash' && paid < total) {
-      alert('المبلغ المدفوع أقل من الإجمالي');
+      alert(t('pos.insufficientPaid'));
       return;
     }
     setProcessing(true);
@@ -271,7 +269,6 @@ export default function POS() {
       });
       const invoice = await res.json();
       if (invoice.id) {
-        // تحويل القيم إلى أرقام
         invoice.total = toNumber(invoice.total);
         invoice.items = (invoice.items || []).map((item: any) => ({
           ...item,
@@ -292,7 +289,7 @@ export default function POS() {
       }
     } catch (err) {
       console.error(err);
-      alert('خطأ في إتمام العملية');
+      alert(t('pos.checkoutError'));
     }
     setProcessing(false);
   };
@@ -302,7 +299,7 @@ export default function POS() {
   if (loadingSession) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80vh' }}>
-        <p>جاري التحميل...</p>
+        <p>{t('common.loading')}</p>
       </div>
     );
   }
@@ -312,18 +309,18 @@ export default function POS() {
       <div dir="rtl" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80vh', fontFamily: 'Tajawal, sans-serif' }}>
         <div style={{ textAlign: 'center', background: 'white', padding: '2rem', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,0.08)', maxWidth: 400, width: '90%' }}>
           <div style={{ fontSize: 56, marginBottom: 16 }}>🏪</div>
-          <h2 style={{ marginBottom: 8 }}>نقطة البيع</h2>
-          <p style={{ color: '#888', marginBottom: 24 }}>افتح جلسة جديدة لبدء البيع</p>
+          <h2 style={{ marginBottom: 8 }}>{t('pos.title')}</h2>
+          <p style={{ color: '#888', marginBottom: 24 }}>{t('pos.openSessionPrompt')}</p>
           {!showOpenSession ? (
             <button
               onClick={() => setShowOpenSession(true)}
               style={{ width: '100%', padding: '14px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 10, fontSize: 16, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}
             >
-              فتح جلسة جديدة
+              {t('pos.openSession')}
             </button>
           ) : (
             <div>
-              <label style={{ display: 'block', textAlign: 'right', marginBottom: 8, fontWeight: 600 }}>رصيد الصندوق الافتتاحي (ريال)</label>
+              <label style={{ display: 'block', textAlign: 'right', marginBottom: 8, fontWeight: 600 }}>{t('pos.openingCash')}</label>
               <input
                 type="number"
                 value={openingCash}
@@ -335,7 +332,7 @@ export default function POS() {
                 onClick={openSession}
                 style={{ width: '100%', padding: '12px', background: '#059669', color: 'white', border: 'none', borderRadius: 8, fontSize: 15, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}
               >
-                بدء الجلسة ✅
+                {t('pos.startSession')}
               </button>
             </div>
           )}
@@ -356,13 +353,12 @@ export default function POS() {
 
       {/* الجانب الأيسر - المنتجات والبحث */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 16, overflow: 'hidden' }}>
-        {/* شريط البحث */}
         <div style={{ position: 'relative', marginBottom: 12 }}>
           <input
             ref={searchRef}
             value={search}
             onChange={e => handleSearchChange(e.target.value)}
-            placeholder="🔍 ابحث بالاسم أو الباركود..."
+            placeholder={t('pos.searchPlaceholder')}
             style={{
               width: '100%', padding: '14px 16px', borderRadius: 12,
               border: '2px solid #e2e8f0', fontSize: 16, boxSizing: 'border-box',
@@ -388,27 +384,26 @@ export default function POS() {
                 >
                   <div>
                     <div style={{ fontWeight: 600 }}>{p.name}</div>
-                    <div style={{ fontSize: 12, color: '#64748b' }}>{p.category || 'عام'} | متبقي: {p.quantity}</div>
+                    <div style={{ fontSize: 12, color: '#64748b' }}>{p.category || t('pos.general')} | {t('pos.remaining')}: {p.quantity}</div>
                   </div>
-                  <div style={{ fontWeight: 700, color: '#2563eb', fontSize: 16 }}>{toNumber(p.price).toFixed(2)} ر.س</div>
+                  <div style={{ fontWeight: 700, color: '#2563eb', fontSize: 16 }}>{toNumber(p.price).toFixed(2)} {t('common.currency')}</div>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* السلة */}
         <div style={{ flex: 1, background: 'white', borderRadius: 16, overflow: 'auto', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
           {cart.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>🛒</div>
-              <p>ابحث عن منتج وأضفه للسلة</p>
+              <p>{t('pos.emptyCart')}</p>
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', position: 'sticky', top: 0 }}>
-                  {['المنتج', 'السعر', 'الكمية', 'خصم', 'الإجمالي', ''].map(h => (
+                  {[t('pos.product'), t('pos.price'), t('pos.quantity'), t('pos.discount'), t('pos.total'), ''].map(h => (
                     <th key={h} style={{ padding: '12px 8px', textAlign: 'right', fontSize: 13, color: '#64748b', fontWeight: 600 }}>{h}</th>
                   ))}
                 </tr>
@@ -443,7 +438,7 @@ export default function POS() {
                       />
                     </td>
                     <td style={{ padding: '10px 8px', fontWeight: 700, color: '#2563eb' }}>
-                      {toNumber(item.total).toFixed(2)} ر.س
+                      {toNumber(item.total).toFixed(2)} {t('common.currency')}
                     </td>
                     <td style={{ padding: '10px 8px' }}>
                       <button onClick={() => removeFromCart(idx)}
@@ -461,42 +456,39 @@ export default function POS() {
 
       {/* الجانب الأيمن - الحساب والدفع */}
       <div style={{ width: 340, background: 'white', display: 'flex', flexDirection: 'column', boxShadow: '-2px 0 8px rgba(0,0,0,0.06)', overflow: 'auto' }}>
-        {/* رأس الجلسة */}
         <div style={{ padding: '12px 16px', background: '#1e293b', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 12, opacity: 0.7 }}>جلسة مفتوحة</div>
+            <div style={{ fontSize: 12, opacity: 0.7 }}>{t('pos.openSession')}</div>
             <div style={{ fontSize: 13, fontWeight: 600 }}>{session.opened_by_name}</div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => setShowHistory(!showHistory)}
               style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, padding: '6px 10px', color: 'white', cursor: 'pointer', fontSize: 12 }}>
-              📋 السجل ({sessionInvoices.length})
+              📋 {t('pos.history')} ({sessionInvoices.length})
             </button>
             <button onClick={() => setShowCloseSession(true)}
               style={{ background: '#dc2626', border: 'none', borderRadius: 8, padding: '6px 10px', color: 'white', cursor: 'pointer', fontSize: 12 }}>
-              إغلاق
+              {t('pos.closeSession')}
             </button>
           </div>
         </div>
 
         <div style={{ flex: 1, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* بيانات العميل */}
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>بيانات العميل (اختياري)</div>
-            <input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="اسم العميل"
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>{t('pos.customerData')}</div>
+            <input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder={t('pos.customerName')}
               style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 6, boxSizing: 'border-box', fontFamily: 'Tajawal, sans-serif' }} />
-            <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="رقم الجوال"
+            <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder={t('pos.customerPhone')}
               style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', boxSizing: 'border-box', fontFamily: 'Tajawal, sans-serif' }} />
           </div>
 
-          {/* الخصم */}
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>خصم إضافي</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>{t('pos.discount')}</div>
             <div style={{ display: 'flex', gap: 6 }}>
               <select value={discountType} onChange={e => setDiscountType(e.target.value as any)}
                 style={{ padding: '8px', borderRadius: 8, border: '1px solid #e2e8f0', fontFamily: 'Tajawal, sans-serif' }}>
                 <option value="percent">%</option>
-                <option value="fixed">ر.س</option>
+                <option value="fixed">{t('common.currency')}</option>
               </select>
               <input type="number" value={discountValue || ''} onChange={e => setDiscountValue(parseFloat(e.target.value) || 0)}
                 placeholder="0"
@@ -504,41 +496,38 @@ export default function POS() {
             </div>
           </div>
 
-          {/* الضريبة */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>ضريبة %</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>{t('pos.taxRate')}</div>
             <input type="number" value={taxRate || ''} onChange={e => setTaxRate(parseFloat(e.target.value) || 0)}
               placeholder="0"
               style={{ width: 70, padding: '8px', borderRadius: 8, border: '1px solid #e2e8f0', textAlign: 'center' }} />
           </div>
 
-          {/* الإجمالي */}
           <div style={{ background: '#f8fafc', borderRadius: 12, padding: 14 }}>
             {[
-              ['المجموع الفرعي', `${toNumber(subtotal).toFixed(2)} ر.س`],
-              ['خصم المنتجات', `- ${toNumber(cartDiscount).toFixed(2)} ر.س`],
-              discountAmount > 0 ? ['خصم إضافي', `- ${toNumber(discountAmount).toFixed(2)} ر.س`] : null,
-              taxAmount > 0 ? [`ضريبة ${taxRate}%`, `+ ${toNumber(taxAmount).toFixed(2)} ر.س`] : null,
+              [t('pos.subtotal'), `${toNumber(subtotal).toFixed(2)} ${t('common.currency')}`],
+              [t('pos.productDiscount'), `- ${toNumber(cartDiscount).toFixed(2)} ${t('common.currency')}`],
+              discountAmount > 0 ? [t('pos.extraDiscount'), `- ${toNumber(discountAmount).toFixed(2)} ${t('common.currency')}`] : null,
+              taxAmount > 0 ? [`${t('pos.tax')} ${taxRate}%`, `+ ${toNumber(taxAmount).toFixed(2)} ${t('common.currency')}`] : null,
             ].filter(item => item !== null).map(([label, value], i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13, color: '#64748b' }}>
                 <span>{label}</span><span>{value}</span>
               </div>
             ))}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTop: '2px solid #e2e8f0', fontWeight: 700, fontSize: 18 }}>
-              <span>الإجمالي</span>
-              <span style={{ color: '#2563eb' }}>{toNumber(total).toFixed(2)} ر.س</span>
+              <span>{t('pos.total')}</span>
+              <span style={{ color: '#2563eb' }}>{toNumber(total).toFixed(2)} {t('common.currency')}</span>
             </div>
           </div>
 
-          {/* طريقة الدفع */}
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>طريقة الدفع</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>{t('pos.paymentMethod')}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               {[
-                { value: 'cash', label: '💵 كاش' },
-                { value: 'card', label: '💳 بطاقة' },
-                { value: 'transfer', label: '📱 تحويل' },
-                { value: 'split', label: '🔀 مختلط' },
+                { value: 'cash', label: t('pos.cash') },
+                { value: 'card', label: t('pos.card') },
+                { value: 'transfer', label: t('pos.transfer') },
+                { value: 'split', label: t('pos.split') },
               ].map(m => (
                 <button key={m.value} onClick={() => setPaymentMethod(m.value as PaymentMethod)}
                   style={{
@@ -554,26 +543,23 @@ export default function POS() {
             </div>
           </div>
 
-          {/* المبلغ المدفوع (كاش فقط) */}
           {paymentMethod === 'cash' && (
             <div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>المبلغ المدفوع</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>{t('pos.paidAmount')}</div>
               <input type="number" value={paidAmount} onChange={e => setPaidAmount(e.target.value)}
                 placeholder={toNumber(total).toFixed(2)}
                 style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 16, textAlign: 'center', boxSizing: 'border-box' }} />
               {paid >= total && paid > 0 && (
                 <div style={{ marginTop: 6, padding: '8px', background: '#dcfce7', borderRadius: 8, textAlign: 'center', fontWeight: 700, color: '#166534' }}>
-                  الباقي: {toNumber(change).toFixed(2)} ر.س
+                  {t('pos.change')}: {toNumber(change).toFixed(2)} {t('common.currency')}
                 </div>
               )}
             </div>
           )}
 
-          {/* ملاحظات */}
-          <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="ملاحظات..."
+          <input value={notes} onChange={e => setNotes(e.target.value)} placeholder={t('pos.notes')}
             style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', boxSizing: 'border-box', fontFamily: 'Tajawal, sans-serif' }} />
 
-          {/* زر الدفع */}
           <button
             onClick={checkout}
             disabled={processing || cart.length === 0}
@@ -583,7 +569,7 @@ export default function POS() {
               cursor: cart.length === 0 ? 'not-allowed' : 'pointer',
               fontFamily: 'Tajawal, sans-serif', fontWeight: 700,
             }}>
-            {processing ? 'جاري المعالجة...' : `💳 إتمام البيع — ${toNumber(total).toFixed(2)} ر.س`}
+            {processing ? t('pos.processing') : `${t('pos.completeSale')} — ${toNumber(total).toFixed(2)} ${t('common.currency')}`}
           </button>
         </div>
       </div>
@@ -596,22 +582,22 @@ export default function POS() {
               <div style={{ textAlign: 'center', marginBottom: 16 }}>
                 <div style={{ fontSize: 24 }}>🏪</div>
                 <h3 style={{ margin: '4px 0' }}>{localStorage.getItem('store_name')}</h3>
-                <div style={{ fontSize: 13, color: '#64748b' }}>فاتورة رقم #{lastInvoice.invoice_number}</div>
+                <div style={{ fontSize: 13, color: '#64748b' }}>{t('pos.invoice')} #{lastInvoice.invoice_number}</div>
                 <div style={{ fontSize: 12, color: '#94a3b8' }}>{new Date(lastInvoice.created_at).toLocaleString('ar-SA')}</div>
               </div>
 
               {lastInvoice.customer_name && (
                 <div style={{ marginBottom: 12, padding: '8px', background: '#f8fafc', borderRadius: 8 }}>
-                  <div style={{ fontSize: 13 }}>العميل: <strong>{lastInvoice.customer_name}</strong></div>
+                  <div style={{ fontSize: 13 }}>{t('pos.customerName')}: <strong>{lastInvoice.customer_name}</strong></div>
                 </div>
               )}
 
               <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <th style={{ padding: '6px 4px', textAlign: 'right', fontSize: 12 }}>المنتج</th>
-                    <th style={{ padding: '6px 4px', textAlign: 'center', fontSize: 12 }}>كمية</th>
-                    <th style={{ padding: '6px 4px', textAlign: 'left', fontSize: 12 }}>الإجمالي</th>
+                    <th style={{ padding: '6px 4px', textAlign: 'right', fontSize: 12 }}>{t('pos.product')}</th>
+                    <th style={{ padding: '6px 4px', textAlign: 'center', fontSize: 12 }}>{t('pos.quantity')}</th>
+                    <th style={{ padding: '6px 4px', textAlign: 'left', fontSize: 12 }}>{t('pos.total')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -619,7 +605,7 @@ export default function POS() {
                     <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '6px 4px', fontSize: 13 }}>{item.productName}</td>
                       <td style={{ padding: '6px 4px', textAlign: 'center', fontSize: 13 }}>{toNumber(item.quantity)}</td>
-                      <td style={{ padding: '6px 4px', textAlign: 'left', fontSize: 13 }}>{toNumber(item.total).toFixed(2)} ر.س</td>
+                      <td style={{ padding: '6px 4px', textAlign: 'left', fontSize: 13 }}>{toNumber(item.total).toFixed(2)} {t('common.currency')}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -627,27 +613,27 @@ export default function POS() {
 
               <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 16 }}>
-                  <span>الإجمالي</span>
-                  <span>{toNumber(lastInvoice.total).toFixed(2)} ر.س</span>
+                  <span>{t('pos.total')}</span>
+                  <span>{toNumber(lastInvoice.total).toFixed(2)} {t('common.currency')}</span>
                 </div>
                 <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
-                  طريقة الدفع: {lastInvoice.payment_method === 'cash' ? 'كاش' : lastInvoice.payment_method === 'card' ? 'بطاقة' : 'تحويل'}
+                  {t('pos.paymentMethod')}: {lastInvoice.payment_method === 'cash' ? t('pos.cash') : lastInvoice.payment_method === 'card' ? t('pos.card') : t('pos.transfer')}
                 </div>
               </div>
 
               <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: '#94a3b8' }}>
-                شكراً لتعاملكم معنا 🙏
+                {t('pos.thankYou')}
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
               <button onClick={printInvoice}
                 style={{ flex: 1, padding: '10px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>
-                🖨️ طباعة
+                🖨️ {t('pos.print')}
               </button>
               <button onClick={() => setShowInvoice(false)}
                 style={{ flex: 1, padding: '10px', background: '#f1f5f9', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>
-                إغلاق
+                {t('common.close')}
               </button>
             </div>
           </div>
@@ -658,35 +644,35 @@ export default function POS() {
       {showCloseSession && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div dir="rtl" style={{ background: 'white', borderRadius: 16, padding: 24, maxWidth: 420, width: '90%' }}>
-            <h3 style={{ marginTop: 0 }}>إغلاق الجلسة</h3>
+            <h3 style={{ marginTop: 0 }}>{t('pos.closeSession')}</h3>
             {summary && (
               <div style={{ background: '#f8fafc', borderRadius: 12, padding: 14, marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span>عدد الفواتير</span><strong>{summary.summary?.total_invoices}</strong>
+                  <span>{t('pos.totalInvoices')}</span><strong>{summary.summary?.total_invoices}</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span>إجمالي المبيعات</span><strong>{toNumber(summary.summary?.total_sales).toFixed(2)} ر.س</strong>
+                  <span>{t('pos.totalSales')}</span><strong>{toNumber(summary.summary?.total_sales).toFixed(2)} {t('common.currency')}</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span>مبيعات كاش</span><strong>{toNumber(summary.summary?.cash_sales).toFixed(2)} ر.س</strong>
+                  <span>{t('pos.cashSales')}</span><strong>{toNumber(summary.summary?.cash_sales).toFixed(2)} {t('common.currency')}</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>رصيد الافتتاح</span><strong>{session?.opening_cash} ر.س</strong>
+                  <span>{t('pos.openingCash')}</span><strong>{session?.opening_cash} {t('common.currency')}</strong>
                 </div>
               </div>
             )}
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>رصيد الصندوق عند الإغلاق</label>
+            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>{t('pos.closingCash')}</label>
             <input type="number" value={closingCash} onChange={e => setClosingCash(e.target.value)}
               placeholder="0.00"
               style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 16, boxSizing: 'border-box', textAlign: 'center', fontSize: 16 }} />
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={closeSession}
                 style={{ flex: 1, padding: '12px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', fontWeight: 600 }}>
-                إغلاق الجلسة
+                {t('pos.closeSession')}
               </button>
               <button onClick={() => setShowCloseSession(false)}
                 style={{ flex: 1, padding: '12px', background: '#f1f5f9', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>
-                إلغاء
+                {t('common.cancel')}
               </button>
             </div>
           </div>
