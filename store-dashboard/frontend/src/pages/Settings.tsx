@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const BACKEND = 'https://store-dashboard-backend.onrender.com';
 const FRONTEND = 'https://my-projects-bv31.vercel.app';
@@ -36,11 +37,12 @@ interface Props {
 }
 
 export default function Settings({ storeName, onStoreNameChange }: Props) {
+  const { t } = useTranslation();
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState('موظف');
+  const [inviteRole, setInviteRole] = useState(t('settings.employee'));
   const [inviting, setSending] = useState(false);
   const [inviteError, setInviteError] = useState('');
   const [inviteSuccess, setInviteSuccess] = useState('');
@@ -71,7 +73,7 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
   };
 
   const handleInvite = async () => {
-    if (!inviteEmail.trim()) { setInviteError('اكتب الإيميل'); return; }
+    if (!inviteEmail.trim()) { setInviteError(t('settings.enterEmail')); return; }
     setSending(true);
     setInviteError('');
     setInviteSuccess('');
@@ -82,13 +84,13 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
         body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
       });
       const data = await res.json();
-      if (!res.ok) { setInviteError(data.error || 'حدث خطأ'); }
+      if (!res.ok) { setInviteError(data.error || t('common.errorOccurred')); }
       else {
-        setInviteSuccess(`تم إنشاء رابط الدعوة لـ ${inviteEmail}`);
+        setInviteSuccess(`${t('settings.inviteCreated')} ${inviteEmail}`);
         setInviteEmail('');
         loadData();
       }
-    } catch { setInviteError('تعذر الاتصال بالخادم'); }
+    } catch { setInviteError(t('common.connectionError')); }
     setSending(false);
   };
 
@@ -100,7 +102,7 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
   };
 
   const handleRemoveMember = async (userId: string) => {
-    if (!confirm('هل تريد إزالة هذا العضو؟')) return;
+    if (!confirm(t('settings.confirmRemoveMember'))) return;
     await fetch(`${BACKEND}/stores/${storeId}/members/${userId}`, {
       method: 'DELETE',
       headers: authHeaders(),
@@ -128,20 +130,20 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
   };
 
   const roleColor = (role: string) => {
-    if (role === 'مالك') return '#7c3aed';
-    if (role === 'مدير') return '#2563eb';
+    if (role === t('settings.owner')) return '#7c3aed';
+    if (role === t('settings.manager')) return '#2563eb';
     return '#059669';
   };
 
-  if (loading) return <div className="page"><div className="empty">جاري التحميل...</div></div>;
+  if (loading) return <div className="page"><div className="empty">{t('common.loading')}</div></div>;
 
   return (
     <div className="page" dir="rtl">
-      <div className="page-title">⚙️ إعدادات المتجر</div>
+      <div className="page-title">⚙️ {t('settings.title')}</div>
 
       {/* اسم المتجر */}
       <div className="card" style={{ marginBottom: 24 }}>
-        <div className="card-title">اسم المتجر</div>
+        <div className="card-title">{t('settings.storeName')}</div>
         {editingName ? (
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <input
@@ -155,13 +157,13 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
               disabled={savingName}
               style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}
             >
-              {savingName ? 'حفظ...' : 'حفظ'}
+              {savingName ? t('common.saving') : t('common.save')}
             </button>
             <button
               onClick={() => setEditingName(false)}
               style={{ padding: '10px 16px', background: 'none', border: '1px solid #ddd', borderRadius: 8, cursor: 'pointer' }}
             >
-              إلغاء
+              {t('common.cancel')}
             </button>
           </div>
         ) : (
@@ -171,7 +173,7 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
               onClick={() => { setNewName(storeName || ''); setEditingName(true); }}
               style={{ padding: '6px 14px', background: 'none', border: '1px solid #ddd', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}
             >
-              تعديل
+              {t('common.edit')}
             </button>
           </div>
         )}
@@ -179,12 +181,12 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
 
       {/* دعوة عضو جديد */}
       <div className="card" style={{ marginBottom: 24 }}>
-        <div className="card-title">➕ دعوة عضو جديد</div>
+        <div className="card-title">➕ {t('settings.inviteMember')}</div>
         <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
           <input
             value={inviteEmail}
             onChange={e => setInviteEmail(e.target.value)}
-            placeholder="الإيميل"
+            placeholder={t('settings.emailPlaceholder')}
             type="email"
             style={{ flex: 1, minWidth: 200, padding: '10px 14px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
             onKeyDown={e => e.key === 'Enter' && handleInvite()}
@@ -194,15 +196,15 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
             onChange={e => setInviteRole(e.target.value)}
             style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
           >
-            <option>موظف</option>
-            <option>مدير</option>
+            <option>{t('settings.employee')}</option>
+            <option>{t('settings.manager')}</option>
           </select>
           <button
             onClick={handleInvite}
             disabled={inviting}
             style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}
           >
-            {inviting ? 'جاري الإرسال...' : 'إنشاء دعوة'}
+            {inviting ? t('settings.sending') : t('settings.createInvite')}
           </button>
         </div>
         {inviteError && <div style={{ color: 'red', marginTop: 8, fontSize: 13 }}>{inviteError}</div>}
@@ -212,20 +214,20 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
       {/* الدعوات المعلقة */}
       {invitations.filter(i => !i.acceptedAt).length > 0 && (
         <div className="card" style={{ marginBottom: 24 }}>
-          <div className="card-title">📨 الدعوات المعلقة</div>
+          <div className="card-title">📨 {t('settings.pendingInvites')}</div>
           {invitations.filter(i => !i.acceptedAt).map(inv => (
             <div key={inv.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f3f4f6' }}>
               <div>
                 <div style={{ fontWeight: 500 }}>{inv.email}</div>
                 <div style={{ fontSize: 12, color: '#888' }}>
-                  {inv.role} · تنتهي {new Date(inv.expiresAt).toLocaleDateString('ar-SA')}
+                  {inv.role} · {t('settings.expires')} {new Date(inv.expiresAt).toLocaleDateString('ar-SA')}
                 </div>
               </div>
               <button
                 onClick={() => copyInviteLink(inv.token)}
                 style={{ padding: '6px 14px', background: copiedToken === inv.token ? '#059669' : '#f3f4f6', color: copiedToken === inv.token ? 'white' : '#444', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}
               >
-                {copiedToken === inv.token ? '✅ تم النسخ' : '🔗 نسخ الرابط'}
+                {copiedToken === inv.token ? t('settings.copied') : t('settings.copyLink')}
               </button>
             </div>
           ))}
@@ -234,7 +236,7 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
 
       {/* الأعضاء */}
       <div className="card">
-        <div className="card-title">👥 أعضاء المتجر ({members.length})</div>
+        <div className="card-title">👥 {t('settings.members')} ({members.length})</div>
         {members.map(member => (
           <div key={member.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f3f4f6' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -246,7 +248,7 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
                 </div>
               )}
               <div>
-                <div style={{ fontWeight: 500 }}>{member.user?.name || 'مستخدم'}</div>
+                <div style={{ fontWeight: 500 }}>{member.user?.name || t('settings.user')}</div>
                 <div style={{ fontSize: 12, color: '#888' }}>{member.user?.email}</div>
               </div>
             </div>
@@ -254,12 +256,12 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
               <span style={{ padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: roleColor(member.role) + '20', color: roleColor(member.role) }}>
                 {member.role}
               </span>
-              {member.role !== 'مالك' && (
+              {member.role !== t('settings.owner') && (
                 <button
                   onClick={() => handleRemoveMember(member.userId)}
                   style={{ padding: '4px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}
                 >
-                  إزالة
+                  {t('settings.remove')}
                 </button>
               )}
             </div>
