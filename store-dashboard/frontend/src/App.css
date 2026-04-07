@@ -391,3 +391,75 @@ body {
   cursor: pointer; font-size: 13px; font-family: 'Tajawal', sans-serif;
   text-decoration: underline;
 }
+/* تحسين مظهر الإشعارات */
+.notif-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid #eef2f5;
+  transition: background 0.2s;
+}
+
+.notif-item.warning {
+  background: #fff7e6;
+  border-right: 4px solid #f59e0b;
+}
+.notif-item.warning .notif-msg {
+  color: #78350f;
+  font-weight: 500;
+}
+.notif-item.warning .notif-time {
+  color: #b45309;
+}
+
+.notif-item.info {
+  background: #eef2ff;
+  border-right: 4px solid #3b82f6;
+}
+.notif-item.info .notif-msg {
+  color: #1e3a8a;
+  font-weight: 500;
+}
+.notif-item.info .notif-time {
+  color: #1e40af;
+}
+
+.notif-item.success {
+  background: #ecfdf5;
+  border-right: 4px solid #10b981;
+}
+.notif-item.success .notif-msg {
+  color: #065f46;
+  font-weight: 500;
+}
+.notif-item.success .notif-time {
+  color: #047857;
+}
+
+/* النص العام للإشعارات */
+.notif-msg {
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
+
+.notif-time {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+/* رأس الإشعارات */
+.notif-header {
+  background: #f9fafb;
+  padding: 12px 16px;
+  font-weight: 700;
+  color: #1f2937;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* خلفية اللوحة */
+.notif-panel {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.02);
+  max-height: 400px;
+  overflow-y: auto;
+}
