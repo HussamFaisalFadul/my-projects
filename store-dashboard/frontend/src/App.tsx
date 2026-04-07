@@ -2,7 +2,7 @@ import Login from './pages/Login';
 import Settings from './pages/Settings';
 import JoinPage from './pages/JoinPage';
 import POS from './pages/POS';
-import Storefront from './pages/Storefront'; // استيراد صفحة المتجر العام
+import Storefront from './pages/Storefront';
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { socket, api, Product, Order, StoreStats, Notification } from './api';
@@ -72,12 +72,13 @@ export default function App() {
       })
         .then(r => r.json())
         .then(data => {
-          if (data.success && data.storeId) {
-            localStorage.setItem('store_id', data.storeId);
-            localStorage.setItem('store_name', data.storeName || '');
+          const anyData = data as any; // ✅ إصلاح الخطأ
+          if (anyData.success && anyData.storeId) {
+            localStorage.setItem('store_id', anyData.storeId);
+            localStorage.setItem('store_name', anyData.storeName || '');
             localStorage.removeItem('pending_join_token');
-            setCurrentStoreId(data.storeId);
-            setStoreName(data.storeName);
+            setCurrentStoreId(anyData.storeId);
+            setStoreName(anyData.storeName);
           } else {
             localStorage.removeItem('pending_join_token');
           }
@@ -141,7 +142,8 @@ export default function App() {
         setCurrentStoreId(store.id);
         setStoreName(store.name);
       } else {
-        setStoreError(store.error || t('common.errorOccurred'));
+        // store ليس من النوع Store بل قد يحتوي على error
+        setStoreError((store as any).error || t('common.errorOccurred'));
       }
     } catch {
       setStoreError(t('common.connectionError'));
