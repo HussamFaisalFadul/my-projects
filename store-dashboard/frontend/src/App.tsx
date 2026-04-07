@@ -263,12 +263,16 @@ export default function App() {
                 {notifications.length === 0 ? (
                   <div className="notif-empty">لا توجد تنبيهات</div>
                 ) : (
-                  notifications.slice(0, 10).map(n => (
-                    <div key={n.id} className={`notif-item ${n.type === 'تحذير_مخزون' ? 'warning' : n.type === 'طلب_جديد' ? 'info' : 'success'}`}>
-                      <div className="notif-msg">{n.message}</div>
-                      <div className="notif-time">{new Date(n.createdAt).toLocaleTimeString('ar-SA')}</div>
-                    </div>
-                  ))
+                  notifications.slice(0, 10).map(n => {
+                    // دعم كلاً من createdAt (camelCase) و created_at (snake_case) القادم من socket
+                    const timeValue = (n as any).createdAt ?? (n as any).created_at;
+                    return (
+                      <div key={n.id} className={`notif-item ${n.type === 'تحذير_مخزون' ? 'warning' : n.type === 'طلب_جديد' ? 'info' : 'success'}`}>
+                        <div className="notif-msg">{n.message}</div>
+                        <div className="notif-time">{timeValue ? new Date(timeValue).toLocaleTimeString('ar-SA') : '--:--'}</div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             )}
