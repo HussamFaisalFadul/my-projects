@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api } from '../api'; // استيراد api لجلب بيانات المتجر
+import { api } from '../api'; // تأكد من وجود دالة getStoreById في api.ts
 
 const BACKEND = 'https://store-dashboard-backend.onrender.com';
 const FRONTEND = 'https://my-projects-bv31.vercel.app';
@@ -51,6 +51,8 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState(storeName || '');
   const [savingName, setSavingName] = useState(false);
+
+  // حالة slug المتجر
   const [storeSlug, setStoreSlug] = useState('');
   const [storeLink, setStoreLink] = useState('');
 
@@ -58,7 +60,7 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
 
   useEffect(() => {
     loadData();
-    loadStoreSlug();
+    loadStoreSlug(); // جلب slug المتجر
   }, []);
 
   const loadData = async () => {
@@ -79,9 +81,13 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
   const loadStoreSlug = async () => {
     if (!storeId) return;
     try {
-      const store = await api.getStoreById(storeId);
-      setStoreSlug(store.slug);
-      setStoreLink(`${window.location.origin}/store/${store.slug}`);
+      // استخدم api.getStoreById إذا كانت موجودة، أو جلب مباشر
+      const res = await fetch(`${BACKEND}/stores/${storeId}`, { headers: authHeaders() });
+      const data = await res.json();
+      if (data.slug) {
+        setStoreSlug(data.slug);
+        setStoreLink(`${window.location.origin}/store/${data.slug}`);
+      }
     } catch (err) {
       console.error('فشل جلب slug المتجر', err);
     }
@@ -139,14 +145,11 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
         localStorage.setItem('store_name', data.name);
         onStoreNameChange(data.name);
         setEditingName(false);
+        // بعد تغيير الاسم، يُفضل تحديث slug أيضاً (سيُحدث تلقائياً في الخلفية)
+        loadStoreSlug();
       }
     } catch {}
     setSavingName(false);
-  };
-
-  const copyStoreLink = () => {
-    navigator.clipboard.writeText(storeLink);
-    alert('تم نسخ رابط المتجر');
   };
 
   const roleColor = (role: string) => {
@@ -199,10 +202,10 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
         )}
       </div>
 
-      {/* رابط المتجر العام */}
+      {/* رابط المتجر العام (جديد) */}
       {storeLink && (
         <div className="card" style={{ marginBottom: 24 }}>
-          <div className="card-title">🌐 {t('settings.storeLink')}</div>
+          <div className="card-title">🌐 {t('settings.publicStoreLink') || 'رابط متجرك العام'}</div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <input
               type="text"
@@ -211,14 +214,17 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
               style={{ flex: 1, padding: '10px 14px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, background: '#f8f9fa' }}
             />
             <button
-              onClick={copyStoreLink}
+              onClick={() => {
+                navigator.clipboard.writeText(storeLink);
+                alert('تم نسخ الرابط بنجاح');
+              }}
               style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}
             >
-              📋 {t('common.copy')}
+              📋 نسخ الرابط
             </button>
           </div>
           <p style={{ fontSize: 12, color: '#666', marginTop: 8 }}>
-            {t('settings.storeLinkDesc')}
+            يمكنك مشاركة هذا الرابط مع عملائك لزيارة متجرك الإلكتروني وطلب المنتجات مباشرة.
           </p>
         </div>
       )}
