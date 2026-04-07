@@ -32,22 +32,24 @@ export default function Storefront() {
   const [whatsappLink, setWhatsappLink] = useState('');
 
   useEffect(() => {
-    console.log('Fetching store for slug:', slug);
+    console.log('1. Fetching store for slug:', slug);
     fetch(`${BACKEND}/api/public/stores/${slug}`)
       .then(res => {
+        console.log('2. Response status:', res.status);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       })
       .then(data => {
-        console.log('Store data:', data);
+        console.log('3. Received data:', data);
         if (data.error) throw new Error(data.error);
         setStore(data);
       })
       .catch(err => {
-        console.error('Fetch error:', err);
+        console.error('4. Fetch error:', err);
         setError(err.message);
       })
       .finally(() => {
+        console.log('5. Setting loading to false');
         setLoading(false);
       });
   }, [slug]);
