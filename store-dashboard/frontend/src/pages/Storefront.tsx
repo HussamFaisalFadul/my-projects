@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+
+const BACKEND = 'https://store-dashboard-backend.onrender.com';
 
 interface Product {
   id: string;
@@ -12,13 +13,19 @@ interface Product {
 }
 
 export default function Storefront() {
-  const { slug } = useParams<{ slug: string }>();
+  // استخراج slug من الرابط مباشرة (لأننا لا نستخدم React Router)
+  const slug = window.location.pathname.split('/store/')[1];
   const [store, setStore] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const apiUrl = `https://store-dashboard-backend.onrender.com/api/public/stores/${slug}`;
+    if (!slug) {
+      setError('رابط غير صحيح');
+      setLoading(false);
+      return;
+    }
+    const apiUrl = `${BACKEND}/api/public/stores/${slug}`;
     console.log('Fetching:', apiUrl);
     fetch(apiUrl)
       .then(res => {
@@ -36,19 +43,23 @@ export default function Storefront() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  if (loading) return <div>جاري تحميل المتجر...</div>;
-  if (error) return <div>حدث خطأ: {error}</div>;
-  if (!store) return <div>المتجر غير موجود</div>;
+  if (loading) return <div style={{ padding: 20, textAlign: 'center' }}>جاري تحميل المتجر...</div>;
+  if (error) return <div style={{ padding: 20, textAlign: 'center', color: 'red' }}>حدث خطأ: {error}</div>;
+  if (!store) return <div style={{ padding: 20, textAlign: 'center' }}>المتجر غير موجود</div>;
 
   return (
-    <div>
+    <div style={{ padding: 20, fontFamily: 'Tajawal, sans-serif', direction: 'rtl' }}>
       <h1>{store.name}</h1>
-      {store.products && store.products.map((p: any) => (
-        <div key={p.id}>
-          <h3>{p.name}</h3>
-          <p>{p.price} ريال</p>
-        </div>
-      ))}
+      {store.products && store.products.length === 0 && <p>لا توجد منتجات متاحة حالياً</p>}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
+        {store.products && store.products.map((product: Product) => (
+          <div key={product.id} style={{ border: '1px solid #ddd', padding: 12, borderRadius: 8 }}>
+            <h3>{product.name}</h3>
+            <p>{product.price} ريال</p>
+            <p>المتبقي: {product.quantity}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
