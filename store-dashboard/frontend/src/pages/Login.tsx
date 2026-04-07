@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   onLogin: (token: string, user: any) => void;
@@ -25,6 +26,7 @@ async function fetchAndSaveStore(token: string) {
 }
 
 export default function Login({ onLogin }: Props) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
@@ -49,7 +51,7 @@ export default function Login({ onLogin }: Props) {
   const handleSubmit = async () => {
     setError('');
     if (!form.email || !form.password) {
-      setError('الإيميل وكلمة المرور مطلوبان');
+      setError(t('login.emailPasswordRequired'));
       return;
     }
     setLoading(true);
@@ -73,7 +75,7 @@ export default function Login({ onLogin }: Props) {
 
       onLogin(data.token, data.user);
     } catch {
-      setError('خطأ في الاتصال بالخادم');
+      setError(t('login.connectionError'));
     } finally {
       setLoading(false);
     }
@@ -83,18 +85,18 @@ export default function Login({ onLogin }: Props) {
     <div className="login-page" dir="rtl">
       <div className="login-card">
         <div className="login-logo">🏪</div>
-        <h1 className="login-title">لوحة تحكم المتجر</h1>
+        <h1 className="login-title">{t('login.title')}</h1>
         <p className="login-subtitle">
-          {mode === 'login' ? 'أهلاً بعودتك' : 'إنشاء حساب جديد'}
+          {mode === 'login' ? t('login.welcomeBack') : t('login.createAccount')}
         </p>
 
         {error && <div className="login-error">{error}</div>}
 
         {mode === 'register' && (
           <div className="form-group">
-            <label>الاسم</label>
+            <label>{t('login.name')}</label>
             <input
-              placeholder="اسمك الكامل"
+              placeholder={t('login.namePlaceholder')}
               value={form.name}
               onChange={e => setForm({ ...form, name: e.target.value })}
             />
@@ -102,7 +104,7 @@ export default function Login({ onLogin }: Props) {
         )}
 
         <div className="form-group">
-          <label>الإيميل</label>
+          <label>{t('login.email')}</label>
           <input
             type="email"
             placeholder="example@email.com"
@@ -112,7 +114,7 @@ export default function Login({ onLogin }: Props) {
         </div>
 
         <div className="form-group">
-          <label>كلمة المرور</label>
+          <label>{t('login.password')}</label>
           <input
             type="password"
             placeholder="••••••••"
@@ -122,22 +124,21 @@ export default function Login({ onLogin }: Props) {
         </div>
 
         <button className="btn-primary login-btn" onClick={handleSubmit} disabled={loading}>
-          {loading ? 'جاري التحميل...' : mode === 'login' ? 'تسجيل الدخول' : 'إنشاء الحساب'}
+          {loading ? t('common.loading') : mode === 'login' ? t('login.login') : t('login.register')}
         </button>
 
-        <div className="login-divider"><span>أو</span></div>
+        <div className="login-divider"><span>{t('login.or')}</span></div>
 
         <a href={`${BACKEND}/auth/google?prompt=select_account`} className="google-btn">
-
           <span className="google-icon">G</span>
-          تسجيل الدخول بحساب جوجل
+          {t('login.googleLogin')}
         </a>
 
         <div className="login-switch">
           {mode === 'login' ? (
-            <span>ليس لديك حساب؟ <button onClick={() => setMode('register')}>إنشاء حساب</button></span>
+            <span>{t('login.noAccount')} <button onClick={() => setMode('register')}>{t('login.register')}</button></span>
           ) : (
-            <span>عندك حساب؟ <button onClick={() => setMode('login')}>تسجيل الدخول</button></span>
+            <span>{t('login.haveAccount')} <button onClick={() => setMode('login')}>{t('login.login')}</button></span>
           )}
         </div>
       </div>
