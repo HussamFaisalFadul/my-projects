@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { api } from '../api'; // استيراد api لجلب بيانات المتجر
 
 const BACKEND = 'https://store-dashboard-backend.onrender.com';
 const FRONTEND = 'https://my-projects-bv31.vercel.app';
@@ -50,11 +51,14 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState(storeName || '');
   const [savingName, setSavingName] = useState(false);
+  const [storeSlug, setStoreSlug] = useState('');
+  const [storeLink, setStoreLink] = useState('');
 
   const storeId = localStorage.getItem('store_id');
 
   useEffect(() => {
     loadData();
+    loadStoreSlug();
   }, []);
 
   const loadData = async () => {
@@ -70,6 +74,17 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
       setInvitations(Array.isArray(i) ? i : []);
     } catch {}
     setLoading(false);
+  };
+
+  const loadStoreSlug = async () => {
+    if (!storeId) return;
+    try {
+      const store = await api.getStoreById(storeId);
+      setStoreSlug(store.slug);
+      setStoreLink(`${window.location.origin}/store/${store.slug}`);
+    } catch (err) {
+      console.error('فشل جلب slug المتجر', err);
+    }
   };
 
   const handleInvite = async () => {
@@ -129,6 +144,11 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
     setSavingName(false);
   };
 
+  const copyStoreLink = () => {
+    navigator.clipboard.writeText(storeLink);
+    alert('تم نسخ رابط المتجر');
+  };
+
   const roleColor = (role: string) => {
     if (role === t('settings.owner')) return '#7c3aed';
     if (role === t('settings.manager')) return '#2563eb';
@@ -178,6 +198,30 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
           </div>
         )}
       </div>
+
+      {/* رابط المتجر العام */}
+      {storeLink && (
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div className="card-title">🌐 {t('settings.storeLink')}</div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <input
+              type="text"
+              readOnly
+              value={storeLink}
+              style={{ flex: 1, padding: '10px 14px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, background: '#f8f9fa' }}
+            />
+            <button
+              onClick={copyStoreLink}
+              style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+            >
+              📋 {t('common.copy')}
+            </button>
+          </div>
+          <p style={{ fontSize: 12, color: '#666', marginTop: 8 }}>
+            {t('settings.storeLinkDesc')}
+          </p>
+        </div>
+      )}
 
       {/* دعوة عضو جديد */}
       <div className="card" style={{ marginBottom: 24 }}>
