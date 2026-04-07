@@ -1,6 +1,22 @@
 import pool from '../db/connection';
 import { Store, StoreMember, Invitation, User } from '../types';
 
+// ===== دالة مساعدة لتوليد slug فريد =====
+async function generateUniqueSlug(baseName: string): Promise<string> {
+  let slug = baseName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  if (!slug) slug = 'store';
+  let unique = slug;
+  let counter = 1;
+  while (true) {
+    const exists = await pool.query('SELECT id FROM stores WHERE slug = $1', [unique]);
+    if (exists.rows.length === 0) return unique;
+    unique = `${slug}-${counter++}`;
+  }
+}
+
 // ===== المتاجر =====
 
 export async function createStore(
@@ -12,10 +28,12 @@ export async function createStore(
   try {
     await client.query('BEGIN');
 
+    const slug = await generateUniqueSlug(name);
+
     const storeResult = await client.query(
-      `INSERT INTO stores (name, description, owner_id)
-       VALUES ($1, $2, $3) RETURNING *`,
-      [name, description || null, ownerId]
+      `INSERT INTO stores (name, slug, description, owner_id)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [name, slug, description || null, ownerId]
     );
     const store = storeResult.rows[0];
 
@@ -212,6 +230,7 @@ function mapStore(row: any): Store {
   return {
     id: row.id,
     name: row.name,
+    slug: row.slug, // أضف هذا السطر
     description: row.description,
     logoUrl: row.logo_url,
     ownerId: row.owner_id,
