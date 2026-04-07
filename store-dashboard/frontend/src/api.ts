@@ -1,15 +1,15 @@
 import { io, Socket } from 'socket.io-client';
 
-// ===== إضافة واجهة Store =====
+// ===== واجهة Store المحدثة =====
 export interface Store {
   id: string;
   name: string;
-  slug: string;          // مهم للرابط العام
+  slug: string;          
   description?: string;
   logoUrl?: string;
   ownerId: string;
-  owner_phone?: string;      // ← أضف هذا السطر
-
+  owner_phone?: string;   // حل مشكلة Storefront.tsx
+  error?: string;         // حل مشكلة App.tsx
   createdAt: string;
   updatedAt: string;
 }
@@ -177,7 +177,6 @@ export async function uploadImageToCloudinary(
 }
 
 export const api = {
-  // ===== المتاجر =====
   getMyStores: (): Promise<Store[]> =>
     fetch(`${BACKEND_URL}/stores`, { headers: authHeaders() }).then(r => r.json()),
 
@@ -191,7 +190,6 @@ export const api = {
       body: JSON.stringify(data),
     }).then(r => r.json()),
 
-  // ===== المنتجات =====
   getProducts: (): Promise<Product[]> =>
     fetch(`${BACKEND_URL}/api/products`, { headers: authHeaders() }).then(r => r.json()),
 
@@ -218,7 +216,6 @@ export const api = {
       headers: authHeaders(),
     }).then(r => r.json()),
 
-  // ===== حركة المخزون =====
   getStockMovements: (productId: string): Promise<StockMovement[]> =>
     fetch(`${BACKEND_URL}/api/products/${productId}/movements`, { headers: authHeaders() }).then(r => r.json()),
 
@@ -234,7 +231,6 @@ export const api = {
       body: JSON.stringify(data),
     }).then(r => r.json()),
 
-  // ===== الطلبات =====
   getOrders: (): Promise<Order[]> =>
     fetch(`${BACKEND_URL}/api/orders`, { headers: authHeaders() }).then(r => r.json()),
 
@@ -252,7 +248,6 @@ export const api = {
       body: JSON.stringify({ status }),
     }).then(r => r.json()),
 
-  // ===== إحصائيات وتنبيهات =====
   getStats: (): Promise<StoreStats> =>
     fetch(`${BACKEND_URL}/api/stats`, { headers: authHeaders() }).then(r => r.json()),
 
@@ -262,7 +257,6 @@ export const api = {
   getReport: (): Promise<{ report: string }> =>
     fetch(`${BACKEND_URL}/api/report`, { headers: authHeaders() }).then(r => r.json()),
 
-  // ===== الموردين =====
   getSuppliers: (): Promise<Supplier[]> =>
     fetch(`${BACKEND_URL}/suppliers`, { headers: authHeaders() }).then(r => r.json()),
 
