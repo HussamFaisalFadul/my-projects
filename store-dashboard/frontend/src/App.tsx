@@ -3,6 +3,7 @@ import Settings from './pages/Settings';
 import JoinPage from './pages/JoinPage';
 import POS from './pages/POS';
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next'; // <-- إضافة الترجمة
 import { socket, api, Product, Order, StoreStats, Notification } from './api';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
@@ -15,6 +16,7 @@ const BACKEND = 'https://store-dashboard-backend.onrender.com';
 type Page = 'dashboard' | 'products' | 'orders' | 'settings' | 'pos' | 'suppliers';
 
 export default function App() {
+  const { t } = useTranslation(); // <-- استخدام الترجمة
   const [page, setPage] = useState<Page>('dashboard');
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -117,7 +119,7 @@ export default function App() {
   };
 
   const handleCreateStore = async () => {
-    if (!newStoreName.trim()) { setStoreError('اكتب اسم المتجر'); return; }
+    if (!newStoreName.trim()) { setStoreError(t('common.requiredField')); return; }
     setCreatingStore(true);
     setStoreError('');
     try {
@@ -128,10 +130,10 @@ export default function App() {
         setCurrentStoreId(store.id);
         setStoreName(store.name);
       } else {
-        setStoreError(store.error || 'حدث خطأ');
+        setStoreError(store.error || t('common.errorOccurred'));
       }
     } catch {
-      setStoreError('تعذر الاتصال بالخادم');
+      setStoreError(t('common.connectionError'));
     }
     setCreatingStore(false);
   };
@@ -183,7 +185,7 @@ export default function App() {
     return (
       <div className="loading-screen">
         <div className="loading-spinner"></div>
-        <p>جاري التحميل...</p>
+        <p>{t('common.loading')}</p>
       </div>
     );
   }
@@ -196,19 +198,19 @@ export default function App() {
     return (
       <div className="app" dir="rtl">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 2rem', borderBottom: '1px solid #eee' }}>
-          <span style={{ fontWeight: 600, color: '#444' }}>مرحباً، {currentUser.name}</span>
+          <span style={{ fontWeight: 600, color: '#444' }}>{t('common.welcome')} {currentUser.name}</span>
           <button onClick={handleLogout} style={{ background: 'none', border: '1px solid #ccc', borderRadius: 8, padding: '6px 16px', cursor: 'pointer', color: '#666' }}>
-            تسجيل خروج
+            {t('common.logout')}
           </button>
         </div>
         <div style={{ maxWidth: 440, margin: '60px auto', padding: '2rem', background: 'white', borderRadius: 20, boxShadow: '0 4px 24px rgba(0,0,0,0.08)', textAlign: 'center' }}>
           <div style={{ fontSize: 52, marginBottom: 16 }}>🏪</div>
-          <h2 style={{ marginBottom: 8 }}>أنشئ متجرك</h2>
-          <p style={{ color: '#888', marginBottom: 24 }}>ابدأ بإنشاء متجرك الخاص مجاناً.</p>
+          <h2 style={{ marginBottom: 8 }}>{t('common.createStore')}</h2>
+          <p style={{ color: '#888', marginBottom: 24 }}>{t('common.createStoreDesc')}</p>
           <input
             value={newStoreName}
             onChange={e => setNewStoreName(e.target.value)}
-            placeholder="اسم المتجر"
+            placeholder={t('common.storeNamePlaceholder')}
             style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '1px solid #ddd', fontSize: 16, marginBottom: 12, boxSizing: 'border-box', textAlign: 'right' }}
             onKeyDown={e => e.key === 'Enter' && handleCreateStore()}
           />
@@ -218,12 +220,12 @@ export default function App() {
             disabled={creatingStore}
             style={{ width: '100%', padding: '12px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 10, fontSize: 16, cursor: 'pointer' }}
           >
-            {creatingStore ? 'جاري الإنشاء...' : 'إنشاء المتجر'}
+            {creatingStore ? t('common.creating') : t('common.createStore')}
           </button>
           {localStorage.getItem('pending_join_token') && (
             <div style={{ marginTop: 20, padding: 16, background: '#fef3c7', borderRadius: 10 }}>
               <p style={{ color: '#92400e', fontSize: 14, marginBottom: 8 }}>
-                ⏳ عندك دعوة معلقة — سجّل دخول بالإيميل المدعو لقبولها
+                {t('common.pendingInvite')}
               </p>
             </div>
           )}
@@ -236,21 +238,33 @@ export default function App() {
     <div className="app" dir="rtl">
       <header className="header">
         <div className="header-right">
-          <div className="logo">🏪 {storeName || 'متجري'}</div>
+          <div className="logo">🏪 {storeName || t('common.myStore')}</div>
           <nav className="nav">
-            <button className={page === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('dashboard')}>الرئيسية</button>
-            <button className={page === 'products' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('products')}>المنتجات</button>
-            <button className={page === 'orders' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('orders')}>الطلبات</button>
-            <button className={page === 'suppliers' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('suppliers')}>🏭 الموردون</button>
-            <button className={page === 'pos' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('pos')}>💳 الكاشير</button>
-            <button className={page === 'settings' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('settings')}>⚙️ الإعدادات</button>
+            <button className={page === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('dashboard')}>
+              {t('nav.dashboard')}
+            </button>
+            <button className={page === 'products' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('products')}>
+              {t('nav.products')}
+            </button>
+            <button className={page === 'orders' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('orders')}>
+              {t('nav.orders')}
+            </button>
+            <button className={page === 'suppliers' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('suppliers')}>
+              {t('nav.suppliers')}
+            </button>
+            <button className={page === 'pos' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('pos')}>
+              {t('nav.pos')}
+            </button>
+            <button className={page === 'settings' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('settings')}>
+              {t('nav.settings')}
+            </button>
           </nav>
         </div>
 
         <div className="header-left">
           <div className="connected-users">
             <span className={`status-dot ${isConnected ? 'online' : 'offline'}`}></span>
-            <span>{isConnected ? 'متصل' : 'غير متصل'}</span>
+            <span>{isConnected ? t('common.connected') : t('common.disconnected')}</span>
           </div>
 
           <div className="notif-wrapper">
@@ -259,12 +273,11 @@ export default function App() {
             </button>
             {showNotifications && (
               <div className="notif-panel">
-                <div className="notif-header">التنبيهات</div>
+                <div className="notif-header">{t('notifications.title')}</div>
                 {notifications.length === 0 ? (
-                  <div className="notif-empty">لا توجد تنبيهات</div>
+                  <div className="notif-empty">{t('notifications.noNotifications')}</div>
                 ) : (
                   notifications.slice(0, 10).map(n => {
-                    // دعم كلاً من createdAt (camelCase) و created_at (snake_case) القادم من socket
                     const timeValue = (n as any).createdAt ?? (n as any).created_at;
                     return (
                       <div key={n.id} className={`notif-item ${n.type === 'تحذير_مخزون' ? 'warning' : n.type === 'طلب_جديد' ? 'info' : 'success'}`}>
@@ -287,7 +300,7 @@ export default function App() {
               onClick={handleLogout}
               style={{ background: 'none', border: '1px solid #ddd', borderRadius: 8, padding: '4px 12px', cursor: 'pointer', fontSize: 13, color: '#666' }}
             >
-              خروج
+              {t('common.logout')}
             </button>
           </div>
         </div>
