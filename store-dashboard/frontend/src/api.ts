@@ -8,6 +8,8 @@ export interface Store {
   description?: string;
   logoUrl?: string;
   ownerId: string;
+  owner_phone?: string;      // ← أضف هذا السطر
+
   createdAt: string;
   updatedAt: string;
 }
