@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Order, Product, api } from '../api';
 
 interface Props {
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export default function Orders({ orders, products }: Props) {
+  const { t } = useTranslation();
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState<Order['status'] | 'الكل'>('الكل');
@@ -64,17 +66,20 @@ export default function Orders({ orders, products }: Props) {
     await api.updateOrderStatus(orderId, status);
   };
 
+  // قائمة خيارات الفلتر
+  const filterOptions: (Order['status'] | 'الكل')[] = ['الكل', 'جديد', 'قيد التنفيذ', 'مكتمل', 'ملغي'];
+
   return (
     <div className="page">
       <div className="page-header">
-        <div className="page-title">الطلبات ({orders.length})</div>
-        <button className="btn-primary" onClick={() => setShowForm(true)}>+ طلب جديد</button>
+        <div className="page-title">{t('orders.title')} ({orders.length})</div>
+        <button className="btn-primary" onClick={() => setShowForm(true)}>+ {t('orders.newOrder')}</button>
       </div>
 
       <div className="filter-row">
-        {(['الكل', 'جديد', 'قيد التنفيذ', 'مكتمل', 'ملغي'] as const).map((s) => (
+        {filterOptions.map((s) => (
           <button key={s} className={`filter-btn ${filter === s ? 'active' : ''}`} onClick={() => setFilter(s)}>
-            {s}
+            {s === 'الكل' ? t('orders.filterAll') : t(`orders.${s === 'جديد' ? 'new' : s === 'قيد التنفيذ' ? 'pending' : s === 'مكتمل' ? 'completed' : 'cancelled'}`)}
             {s !== 'الكل' && <span className="filter-count">{orders.filter((o) => o.status === s).length}</span>}
           </button>
         ))}
@@ -83,57 +88,59 @@ export default function Orders({ orders, products }: Props) {
       {showForm && (
         <div className="modal-overlay">
           <div className="modal wide">
-            <div className="modal-title">إضافة طلب جديد</div>
+            <div className="modal-title">{t('orders.newOrder')}</div>
             <div className="form-grid">
               <div className="form-group">
-                <label>اسم الزبون</label>
-                <input value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} placeholder="أم محمد" />
+                <label>{t('orders.customerName')}</label>
+                <input value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} placeholder={t('orders.customerNamePlaceholder')} />
               </div>
               <div className="form-group">
-                <label>رقم الجوال</label>
-                <input value={form.customerPhone} onChange={(e) => setForm({ ...form, customerPhone: e.target.value })} placeholder="05xxxxxxxx" />
+                <label>{t('orders.customerPhone')}</label>
+                <input value={form.customerPhone} onChange={(e) => setForm({ ...form, customerPhone: e.target.value })} placeholder={t('orders.customerPhonePlaceholder')} />
               </div>
               <div className="form-group">
-                <label>مصدر الطلب</label>
+                <label>{t('orders.source')}</label>
                 <select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value as Order['source'] })}>
-                  <option>واتساب</option>
-                  <option>انستغرام</option>
-                  <option>مباشر</option>
+                  <option value="واتساب">{t('orders.whatsapp')}</option>
+                  <option value="انستغرام">{t('orders.instagram')}</option>
+                  <option value="مباشر">{t('orders.direct')}</option>
                 </select>
               </div>
               <div className="form-group">
-                <label>ملاحظات</label>
-                <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="توصيل سريع..." />
+                <label>{t('orders.notes')}</label>
+                <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder={t('orders.notesPlaceholder')} />
               </div>
             </div>
 
             <div className="order-items-section">
-              <div className="items-header">المنتجات</div>
+              <div className="items-header">{t('orders.items')}</div>
               <div className="add-item-row">
                 <select value={form.selectedProduct} onChange={(e) => setForm({ ...form, selectedProduct: e.target.value })}>
-                  <option value="">اختر منتجاً...</option>
+                  <option value="">{t('orders.selectProduct')}</option>
                   {products.filter((p) => p.quantity > 0).map((p) => (
-                    <option key={p.id} value={p.id}>{p.name} — {p.price} ر ({p.quantity} متاح)</option>
+                    <option key={p.id} value={p.id}>
+                      {p.name} — {p.price} {t('common.currency')} ({t('orders.stockAvailable', { count: p.quantity })})
+                    </option>
                   ))}
                 </select>
                 <input type="number" min={1} value={form.selectedQty} onChange={(e) => setForm({ ...form, selectedQty: Number(e.target.value) })} style={{ width: '70px' }} />
-                <button className="btn-secondary" onClick={addItem}>إضافة</button>
+                <button className="btn-secondary" onClick={addItem}>{t('common.add')}</button>
               </div>
               {form.items.map((item) => (
                 <div key={item.productId} className="order-item">
                   <span>{item.productName}</span>
-                  <span>{item.quantity} × {item.price} = {item.quantity * item.price} ر</span>
+                  <span>{item.quantity} × {item.price} {t('common.currency')} = {item.quantity * item.price} {t('common.currency')}</span>
                   <button className="btn-delete small" onClick={() => removeItem(item.productId)}>×</button>
                 </div>
               ))}
-              {form.items.length > 0 && <div className="order-total">الإجمالي: {totalPrice} ريال</div>}
+              {form.items.length > 0 && <div className="order-total">{t('orders.total')}: {totalPrice} {t('common.currency')}</div>}
             </div>
 
             <div className="modal-actions">
               <button className="btn-primary" onClick={handleSubmit} disabled={saving || form.items.length === 0}>
-                {saving ? 'جاري الحفظ...' : 'تسجيل الطلب'}
+                {saving ? t('common.saving') : t('orders.submitOrder')}
               </button>
-              <button className="btn-secondary" onClick={() => setShowForm(false)}>إلغاء</button>
+              <button className="btn-secondary" onClick={() => setShowForm(false)}>{t('common.cancel')}</button>
             </div>
           </div>
         </div>
@@ -149,26 +156,26 @@ export default function Orders({ orders, products }: Props) {
               </div>
               <div className="order-meta">
                 <span className={`source-badge ${order.source === 'واتساب' ? 'whatsapp' : order.source === 'انستغرام' ? 'instagram' : 'direct'}`}>
-                  {order.source}
+                  {order.source === 'واتساب' ? t('orders.whatsapp') : order.source === 'انستغرام' ? t('orders.instagram') : t('orders.direct')}
                 </span>
-                <div className="order-price">{order.totalPrice} ريال</div>
+                <div className="order-price">{order.totalPrice} {t('common.currency')}</div>
               </div>
             </div>
             {order.notes && <div className="order-notes">📝 {order.notes}</div>}
             <div className="order-time">{new Date(order.createdAt).toLocaleString('ar-SA')}</div>
             <div className="order-footer">
               <select value={order.status} onChange={(e) => handleStatusChange(order.id, e.target.value as Order['status'])} className={`status-select ${order.status === 'مكتمل' ? 'done' : order.status === 'جديد' ? 'new' : order.status === 'ملغي' ? 'cancelled' : 'pending'}`}>
-                <option>جديد</option>
-                <option>قيد التنفيذ</option>
-                <option>مكتمل</option>
-                <option>ملغي</option>
+                <option value="جديد">{t('orders.new')}</option>
+                <option value="قيد التنفيذ">{t('orders.pending')}</option>
+                <option value="مكتمل">{t('orders.completed')}</option>
+                <option value="ملغي">{t('orders.cancelled')}</option>
               </select>
             </div>
           </div>
         ))}
       </div>
 
-      {filtered.length === 0 && <div className="empty">لا توجد طلبات في هذه الحالة</div>}
+      {filtered.length === 0 && <div className="empty">{t('orders.noOrders')}</div>}
     </div>
   );
 }
