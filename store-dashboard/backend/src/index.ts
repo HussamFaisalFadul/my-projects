@@ -8,6 +8,7 @@ import authRouter from './auth/routes';
 import storesRouter from './stores/routes';
 import posRouter from './pos/routes';
 import suppliersRouter from './suppliers/routes';
+import publicRouter from './public/routes'; // <-- إضافة المسارات العامة
 import { authMiddleware } from './auth/auth';
 import {
   getProducts,
@@ -41,6 +42,9 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
   cors: { origin: '*', methods: ['GET', 'POST'] },
 });
 
+// تخزين io في app لاستخدامه في الـ routes
+app.set('io', io);
+
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.use(passport.initialize());
@@ -50,6 +54,7 @@ app.use('/auth', authRouter);
 app.use('/stores', storesRouter);
 app.use('/pos', posRouter);
 app.use('/suppliers', suppliersRouter);
+app.use('/api/public', publicRouter); // <-- إضافة مسارات API العامة
 
 // ===== ميدلوير التحقق من المتجر =====
 async function requireStore(req: any, res: any, next: any) {
