@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const BACKEND_URL = 'https://store-dashboard-backend.onrender.com';
 
@@ -7,6 +8,8 @@ interface Props {
 }
 
 export default function AuthCallback({ onLogin }: Props) {
+  const { t } = useTranslation();
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
@@ -38,11 +41,11 @@ export default function AuthCallback({ onLogin }: Props) {
     } else {
       window.location.href = '/login?error=google';
     }
-  }, []);
+  }, [onLogin]);
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'Tajawal, sans-serif' }}>
-      <p>جاري تسجيل الدخول...</p>
+      <p>{t('auth.loggingIn')}</p>
     </div>
   );
 }
