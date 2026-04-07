@@ -9,6 +9,7 @@ export interface User {
 export interface Store {
   id: string;
   name: string;
+  slug: string;          // ← تمت الإضافة
   description?: string;
   logoUrl?: string;
   ownerId: string;
@@ -90,7 +91,6 @@ export interface Product {
   category: string;
   minQuantity: number;
   imageUrl?: string;
-  // أعمدة جديدة
   sku?: string;
   barcode?: string;
   description?: string;
@@ -104,7 +104,6 @@ export interface Product {
   unit?: string;
   isActive?: boolean;
   tags?: string[];
-  // علاقات
   images?: ProductImage[];
   variants?: ProductVariant[];
   stockMovements?: StockMovement[];
