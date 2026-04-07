@@ -6,7 +6,6 @@ async function migrate() {
   try {
     console.log('🔄 جاري إنشاء الجداول...');
 
-    // جدول المنتجات الأساسي (مع الحقول الجديدة)
     await client.query(`
       CREATE TABLE IF NOT EXISTS products (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -36,7 +35,6 @@ async function migrate() {
       );
     `);
 
-    // جدول صور المنتج (متعدد)
     await client.query(`
       CREATE TABLE IF NOT EXISTS product_images (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -48,7 +46,6 @@ async function migrate() {
       );
     `);
 
-    // جدول متغيرات المنتج (مقاسات/ألوان)
     await client.query(`
       CREATE TABLE IF NOT EXISTS product_variants (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -66,31 +63,34 @@ async function migrate() {
       );
     `);
 
-    // جدول حركات المخزون
+    // ✅ مطابق للجدول الحقيقي في Neon
     await client.query(`
       CREATE TABLE IF NOT EXISTS stock_movements (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         product_id UUID REFERENCES products(id) ON DELETE CASCADE,
-        store_id UUID,
-        variant_id UUID REFERENCES product_variants(id) ON DELETE SET NULL,
+        store_id UUID NOT NULL,
+        supplier_id UUID,
+        order_id UUID,
         type VARCHAR(30) NOT NULL CHECK (type IN ('purchase', 'sale', 'return', 'adjustment', 'damage')),
-        quantity_change INTEGER NOT NULL,
-        quantity_before INTEGER NOT NULL,
-        quantity_after INTEGER NOT NULL,
-        unit_price DECIMAL(10,2) DEFAULT 0,
-        note TEXT,
+        quantity INTEGER NOT NULL,
+        unit_price DECIMAL(10,2),
+        notes TEXT,
         created_by UUID,
-        created_at TIMESTAMP DEFAULT NOW()
+        created_at TIMESTAMP DEFAULT NOW(),
+        quantity_change INTEGER,
+        quantity_before INTEGER,
+        quantity_after INTEGER,
+        note TEXT
       );
     `);
 
-    // جدول الطلبات
+    // ✅ customer_phone اختياري
     await client.query(`
       CREATE TABLE IF NOT EXISTS orders (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         store_id UUID,
         customer_name VARCHAR(255) NOT NULL,
-        customer_phone VARCHAR(20) NOT NULL,
+        customer_phone VARCHAR(20),
         source VARCHAR(20) NOT NULL CHECK (source IN ('واتساب', 'انستغرام', 'مباشر')),
         total_price DECIMAL(10,2) NOT NULL,
         status VARCHAR(20) NOT NULL DEFAULT 'جديد'
@@ -101,7 +101,6 @@ async function migrate() {
       );
     `);
 
-    // جدول عناصر الطلب
     await client.query(`
       CREATE TABLE IF NOT EXISTS order_items (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -114,7 +113,6 @@ async function migrate() {
       );
     `);
 
-    // جدول التنبيهات
     await client.query(`
       CREATE TABLE IF NOT EXISTS notifications (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -128,7 +126,6 @@ async function migrate() {
       );
     `);
 
-    // دالة تحديث updated_at
     await client.query(`
       CREATE OR REPLACE FUNCTION update_updated_at()
       RETURNS TRIGGER AS $$
@@ -139,7 +136,6 @@ async function migrate() {
       $$ LANGUAGE plpgsql;
     `);
 
-    // Triggers
     await client.query(`
       DROP TRIGGER IF EXISTS update_products_updated_at ON products;
       CREATE TRIGGER update_products_updated_at
@@ -154,10 +150,9 @@ async function migrate() {
         FOR EACH ROW EXECUTE FUNCTION update_updated_at();
     `);
 
-    // بيانات تجريبية (إذا كانت المنتجات فارغة)
+    // بيانات تجريبية
     const existing = await client.query('SELECT COUNT(*) FROM products');
     if (parseInt(existing.rows[0].count) === 0) {
-      // إضافة منتجات تجريبية
       await client.query(`
         INSERT INTO products (name, price, quantity, category, min_quantity, sku, barcode, description, brand, cost_price, sale_price, weight_kg, tax_rate, unit, is_active, tags) VALUES
         ('عباية سوداء فاخرة', 250, 15, 'عبايات', 5, 'AB-001', '1234567890123', 'عباية كاجوال بقصة واسعة', 'دار الأزياء', 180, 250, 0.8, 15, 'قطعة', true, ARRAY['كاجوال', 'أسود']),
@@ -167,7 +162,6 @@ async function migrate() {
       `);
       console.log('✅ تمت إضافة المنتجات التجريبية');
 
-      // إضافة صور تجريبية للمنتج الأول
       const productRes = await client.query('SELECT id FROM products WHERE sku = $1', ['AB-001']);
       if (productRes.rows.length) {
         const productId = productRes.rows[0].id;
@@ -176,11 +170,6 @@ async function migrate() {
           ($1, 'https://placehold.co/600x400/333/white?text=Abaya+1', true, 0),
           ($1, 'https://placehold.co/600x400/555/white?text=Abaya+2', false, 1);
         `, [productId]);
-      }
-
-      // إضافة متغيرات تجريبية للمنتج الأول
-      if (productRes.rows.length) {
-        const productId = productRes.rows[0].id;
         await client.query(`
           INSERT INTO product_variants (product_id, title, attributes, price, cost_price, quantity, sku, sort_order) VALUES
           ($1, 'مقاس M', '{"المقاس":"M"}'::jsonb, 250, 180, 5, 'AB-001-M', 0),
@@ -189,7 +178,6 @@ async function migrate() {
         `, [productId]);
       }
 
-      // إضافة صور للمنتج الثاني
       const productRes2 = await client.query('SELECT id FROM products WHERE sku = $1', ['SH-002']);
       if (productRes2.rows.length) {
         const productId = productRes2.rows[0].id;
