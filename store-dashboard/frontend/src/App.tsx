@@ -16,7 +16,7 @@ const BACKEND = 'https://store-dashboard-backend.onrender.com';
 type Page = 'dashboard' | 'products' | 'orders' | 'settings' | 'pos' | 'suppliers';
 
 export default function App() {
-  const { t } = useTranslation(); // <-- استخدام الترجمة
+  const { t, i18n } = useTranslation(); // <-- إضافة i18n لتغيير اللغة
   const [page, setPage] = useState<Page>('dashboard');
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -39,6 +39,12 @@ export default function App() {
   const [storeName, setStoreName] = useState<string | null>(
     localStorage.getItem('store_name')
   );
+
+  // دالة تبديل اللغة
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'ar' ? 'en' : 'ar';
+    i18n.changeLanguage(newLang);
+  };
 
   // معالجة صفحة الانضمام
   if (window.location.pathname.startsWith('/join/')) {
@@ -235,7 +241,7 @@ export default function App() {
   }
 
   return (
-    <div className="app" dir="rtl">
+    <div className="app" dir={i18n.language === 'ar' ? 'rtl' : 'ltr'}>
       <header className="header">
         <div className="header-right">
           <div className="logo">🏪 {storeName || t('common.myStore')}</div>
@@ -290,6 +296,23 @@ export default function App() {
               </div>
             )}
           </div>
+
+          {/* زر تبديل اللغة */}
+          <button onClick={toggleLanguage} style={{
+            background: 'rgba(255,255,255,0.1)',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '6px 12px',
+            color: 'white',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontFamily: 'Tajawal, sans-serif',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            🌐 {i18n.language === 'ar' ? 'EN' : 'عربي'}
+          </button>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {currentUser.avatarUrl && (
