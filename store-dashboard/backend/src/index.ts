@@ -56,7 +56,101 @@ app.use('/pos', posRouter);
 app.use('/suppliers', suppliersRouter);
 app.use('/api/public', publicRouter); // <-- إضافة مسارات API العامة
 
-// ===== ميدلوير التحقق من المتجر =====
+// ===== مسارات API العامة (بدون توكن) - تضاف هنا كضمان =====
+// جلب متجر بواسطة slug مع منتجاته
+app.get('/api/public/stores/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const pool = (await import('./db/connection')).default;
+
+    // جلب المتجر
+    const storeResult = await pool.query(
+      `SELECT id, name, description, logo_url, owner_id FROM stores WHERE slug = $1`,
+      [slug]
+    );
+    if (storeResult.rows.length === 0) {
+      return res.status(404).json({ error: 'المتجر غير موجود' });
+    }
+    const store = storeResult.rows[0];
+
+    // جلب المنتجات النشطة والتي لها كمية > 0
+    const productsResult = await pool.query(
+      `SELECT id, name, price, quantity, image_url, description, category 
+       FROM products 
+       WHERE store_id = $1 AND is_active = true AND quantity > 0
+       ORDER BY created_at DESC`,
+      [store.id]
+    );
+    store.products = productsResult.rows;
+
+    res.json(store);
+  } catch (err: any) {
+    console.error('❌ خطأ في جلب المتجر العام:', err);
+    res.status(500).json({ error: 'حدث خطأ في الخادم' });
+  }
+});
+
+// إنشاء طلب جديد من العميل (بدون توكن)
+app.post('/api/public/orders', async (req, res) => {
+  const client = await (await import('./db/connection')).default.connect();
+  try {
+    await client.query('BEGIN');
+    const { storeId, customerName, customerPhone, items, totalPrice, notes } = req.body;
+    if (!storeId || !items || !items.length) {
+      return res.status(400).json({ error: 'بيانات الطلب غير مكتملة' });
+    }
+
+    const orderResult = await client.query(
+      `INSERT INTO orders (store_id, customer_name, customer_phone, source, total_price, status, notes)
+       VALUES ($1, $2, $3, 'متجر إلكتروني', $4, 'جديد', $5) RETURNING *`,
+      [storeId, customerName, customerPhone, totalPrice, notes]
+    );
+    const order = orderResult.rows[0];
+
+    for (const item of items) {
+      await client.query(
+        `INSERT INTO order_items (order_id, product_id, product_name, quantity, price)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [order.id, item.productId, item.productName, item.quantity, item.price]
+      );
+      await client.query(
+        `UPDATE products SET quantity = GREATEST(0, quantity - $1) WHERE id = $2`,
+        [item.quantity, item.productId]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    // إرسال إشعار WebSocket
+    const io = req.app.get('io');
+    if (io) {
+      io.to(storeId).emit('order_added', order);
+      io.to(storeId).emit('notification', {
+        message: `طلب جديد من ${customerName} بقيمة ${totalPrice} ريال`,
+        type: 'طلب_جديد',
+        createdAt: new Date(),
+      });
+    }
+
+    // إضافة إشعار في قاعدة البيانات
+    await addNotification(
+      storeId,
+      'طلب_جديد',
+      `طلب جديد من ${customerName} — ${totalPrice} ريال`,
+      { orderId: order.id }
+    );
+
+    res.status(201).json({ success: true, orderId: order.id });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('❌ خطأ في إنشاء الطلب العام:', err);
+    res.status(500).json({ error: 'فشل إنشاء الطلب' });
+  } finally {
+    client.release();
+  }
+});
+
+// ===== باقي المسارات (تحتاج توكن وميدلوير المتجر) =====
 async function requireStore(req: any, res: any, next: any) {
   const storeId = req.headers['x-store-id'] as string;
   if (!storeId) return res.status(400).json({ error: 'معرف المتجر مطلوب' });
