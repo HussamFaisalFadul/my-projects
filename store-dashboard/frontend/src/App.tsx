@@ -2,8 +2,9 @@ import Login from './pages/Login';
 import Settings from './pages/Settings';
 import JoinPage from './pages/JoinPage';
 import POS from './pages/POS';
+import Storefront from './pages/Storefront'; // استيراد صفحة المتجر العام
 import { useState, useEffect, useCallback } from 'react';
-import { useTranslation } from 'react-i18next'; // <-- إضافة الترجمة
+import { useTranslation } from 'react-i18next';
 import { socket, api, Product, Order, StoreStats, Notification } from './api';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
@@ -16,7 +17,7 @@ const BACKEND = 'https://store-dashboard-backend.onrender.com';
 type Page = 'dashboard' | 'products' | 'orders' | 'settings' | 'pos' | 'suppliers';
 
 export default function App() {
-  const { t, i18n } = useTranslation(); // <-- إضافة i18n لتغيير اللغة
+  const { t, i18n } = useTranslation();
   const [page, setPage] = useState<Page>('dashboard');
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -40,7 +41,6 @@ export default function App() {
     localStorage.getItem('store_name')
   );
 
-  // دالة تبديل اللغة
   const toggleLanguage = () => {
     const newLang = i18n.language === 'ar' ? 'en' : 'ar';
     i18n.changeLanguage(newLang);
@@ -49,6 +49,11 @@ export default function App() {
   // معالجة صفحة الانضمام
   if (window.location.pathname.startsWith('/join/')) {
     return <JoinPage />;
+  }
+
+  // إذا كان المسار يبدأ بـ /store/ -> عرض صفحة المتجر العام
+  if (window.location.pathname.startsWith('/store/')) {
+    return <Storefront />;
   }
 
   // ===== عند أول تحميل =====
@@ -149,7 +154,6 @@ export default function App() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   }, []);
 
-  // ===== تحميل البيانات (بدون loading) =====
   useEffect(() => {
     if (!token || !currentStoreId) return;
     Promise.all([
@@ -165,7 +169,6 @@ export default function App() {
     }).catch(() => {});
   }, [token, currentStoreId]);
 
-  // ===== الويب سوكيت =====
   useEffect(() => {
     if (!currentStoreId) return;
     socket.emit('join_store', currentStoreId);
@@ -297,7 +300,6 @@ export default function App() {
             )}
           </div>
 
-          {/* زر تبديل اللغة */}
           <button onClick={toggleLanguage} style={{
             background: 'rgba(255,255,255,0.1)',
             border: 'none',
