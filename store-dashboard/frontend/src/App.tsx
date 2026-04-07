@@ -5,7 +5,7 @@ import POS from './pages/POS';
 import Storefront from './pages/Storefront';
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { socket, api, Product, Order, StoreStats, Notification } from './api';
+import { socket, api, Product, Order, StoreStats, Notification, Store } from './api';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Orders from './pages/Orders';
@@ -46,17 +46,9 @@ export default function App() {
     i18n.changeLanguage(newLang);
   };
 
-  // معالجة صفحة الانضمام
-  if (window.location.pathname.startsWith('/join/')) {
-    return <JoinPage />;
-  }
+  if (window.location.pathname.startsWith('/join/')) return <JoinPage />;
+  if (window.location.pathname.startsWith('/store/')) return <Storefront />;
 
-  // إذا كان المسار يبدأ بـ /store/ -> عرض صفحة المتجر العام
-  if (window.location.pathname.startsWith('/store/')) {
-    return <Storefront />;
-  }
-
-  // ===== عند أول تحميل =====
   useEffect(() => {
     const savedToken = localStorage.getItem('store_token');
     const savedStoreId = localStorage.getItem('store_id');
@@ -72,7 +64,7 @@ export default function App() {
       })
         .then(r => r.json())
         .then(data => {
-          const anyData = data as any; // ✅ إصلاح الخطأ
+          const anyData = data as any;
           if (anyData.success && anyData.storeId) {
             localStorage.setItem('store_id', anyData.storeId);
             localStorage.setItem('store_name', anyData.storeName || '');
@@ -116,10 +108,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('store_token');
-    localStorage.removeItem('store_user');
-    localStorage.removeItem('store_id');
-    localStorage.removeItem('store_name');
+    localStorage.clear();
     setToken(null);
     setCurrentUser(null);
     setCurrentStoreId(null);
@@ -135,15 +124,14 @@ export default function App() {
     setCreatingStore(true);
     setStoreError('');
     try {
-      const store = await api.createStore({ name: newStoreName.trim() });
+      const store: Store = await api.createStore({ name: newStoreName.trim() });
       if (store.id) {
         localStorage.setItem('store_id', store.id);
         localStorage.setItem('store_name', store.name);
         setCurrentStoreId(store.id);
         setStoreName(store.name);
-      } else {
-        // store ليس من النوع Store بل قد يحتوي على error
-        setStoreError((store as any).error || t('common.errorOccurred'));
+      } else if (store.error) {
+        setStoreError(store.error || t('common.errorOccurred'));
       }
     } catch {
       setStoreError(t('common.connectionError'));
@@ -192,54 +180,29 @@ export default function App() {
     };
   }, [currentStoreId]);
 
-  if (initializing) {
-    return (
-      <div className="loading-screen">
-        <div className="loading-spinner"></div>
-        <p>{t('common.loading')}</p>
-      </div>
-    );
-  }
-
-  if (!token || !currentUser) {
-    return <Login onLogin={handleLogin} />;
-  }
+  if (initializing) return <div className="loading-screen"><div className="loading-spinner"></div><p>{t('common.loading')}</p></div>;
+  if (!token || !currentUser) return <Login onLogin={handleLogin} />;
 
   if (!currentStoreId) {
     return (
       <div className="app" dir="rtl">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 2rem', borderBottom: '1px solid #eee' }}>
-          <span style={{ fontWeight: 600, color: '#444' }}>{t('common.welcome')} {currentUser.name}</span>
-          <button onClick={handleLogout} style={{ background: 'none', border: '1px solid #ccc', borderRadius: 8, padding: '6px 16px', cursor: 'pointer', color: '#666' }}>
-            {t('common.logout')}
-          </button>
+          <span style={{ fontWeight: 600 }}>{t('common.welcome')} {currentUser.name}</span>
+          <button onClick={handleLogout} className="nav-btn">{t('common.logout')}</button>
         </div>
-        <div style={{ maxWidth: 440, margin: '60px auto', padding: '2rem', background: 'white', borderRadius: 20, boxShadow: '0 4px 24px rgba(0,0,0,0.08)', textAlign: 'center' }}>
-          <div style={{ fontSize: 52, marginBottom: 16 }}>🏪</div>
-          <h2 style={{ marginBottom: 8 }}>{t('common.createStore')}</h2>
-          <p style={{ color: '#888', marginBottom: 24 }}>{t('common.createStoreDesc')}</p>
+        <div className="create-store-card" style={{ maxWidth: 440, margin: '60px auto', padding: '2rem', textAlign: 'center' }}>
+          <h2>{t('common.createStore')}</h2>
           <input
             value={newStoreName}
             onChange={e => setNewStoreName(e.target.value)}
             placeholder={t('common.storeNamePlaceholder')}
-            style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '1px solid #ddd', fontSize: 16, marginBottom: 12, boxSizing: 'border-box', textAlign: 'right' }}
-            onKeyDown={e => e.key === 'Enter' && handleCreateStore()}
+            className="input-field"
+            style={{ width: '100%', marginBottom: 12, padding: 10 }}
           />
           {storeError && <div style={{ color: 'red', marginBottom: 12 }}>{storeError}</div>}
-          <button
-            onClick={handleCreateStore}
-            disabled={creatingStore}
-            style={{ width: '100%', padding: '12px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 10, fontSize: 16, cursor: 'pointer' }}
-          >
+          <button onClick={handleCreateStore} disabled={creatingStore} className="primary-btn" style={{ width: '100%' }}>
             {creatingStore ? t('common.creating') : t('common.createStore')}
           </button>
-          {localStorage.getItem('pending_join_token') && (
-            <div style={{ marginTop: 20, padding: 16, background: '#fef3c7', borderRadius: 10 }}>
-              <p style={{ color: '#92400e', fontSize: 14, marginBottom: 8 }}>
-                {t('common.pendingInvite')}
-              </p>
-            </div>
-          )}
         </div>
       </div>
     );
@@ -251,95 +214,30 @@ export default function App() {
         <div className="header-right">
           <div className="logo">🏪 {storeName || t('common.myStore')}</div>
           <nav className="nav">
-            <button className={page === 'dashboard' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('dashboard')}>
-              {t('nav.dashboard')}
-            </button>
-            <button className={page === 'products' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('products')}>
-              {t('nav.products')}
-            </button>
-            <button className={page === 'orders' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('orders')}>
-              {t('nav.orders')}
-            </button>
-            <button className={page === 'suppliers' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('suppliers')}>
-              {t('nav.suppliers')}
-            </button>
-            <button className={page === 'pos' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('pos')}>
-              {t('nav.pos')}
-            </button>
-            <button className={page === 'settings' ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage('settings')}>
-              {t('nav.settings')}
-            </button>
+            {['dashboard', 'products', 'orders', 'suppliers', 'pos', 'settings'].map((p) => (
+              <button key={p} className={page === p ? 'nav-btn active' : 'nav-btn'} onClick={() => setPage(p as Page)}>
+                {t(`nav.${p}`)}
+              </button>
+            ))}
           </nav>
         </div>
-
-        <div className="header-left">
-          <div className="connected-users">
-            <span className={`status-dot ${isConnected ? 'online' : 'offline'}`}></span>
-            <span>{isConnected ? t('common.connected') : t('common.disconnected')}</span>
-          </div>
-
-          <div className="notif-wrapper">
-            <button className="notif-btn" onClick={() => { setShowNotifications(!showNotifications); if (!showNotifications) markAllRead(); }}>
-              🔔{unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
-            </button>
-            {showNotifications && (
-              <div className="notif-panel">
-                <div className="notif-header">{t('notifications.title')}</div>
-                {notifications.length === 0 ? (
-                  <div className="notif-empty">{t('notifications.noNotifications')}</div>
-                ) : (
-                  notifications.slice(0, 10).map(n => {
-                    const timeValue = (n as any).createdAt ?? (n as any).created_at;
-                    return (
-                      <div key={n.id} className={`notif-item ${n.type === 'تحذير_مخزون' ? 'warning' : n.type === 'طلب_جديد' ? 'info' : 'success'}`}>
-                        <div className="notif-msg">{n.message}</div>
-                        <div className="notif-time">{timeValue ? new Date(timeValue).toLocaleTimeString('ar-SA') : '--:--'}</div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
-          </div>
-
-          <button onClick={toggleLanguage} style={{
-            background: 'rgba(255,255,255,0.1)',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '6px 12px',
-            color: 'white',
-            cursor: 'pointer',
-            fontSize: '13px',
-            fontFamily: 'Tajawal, sans-serif',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px'
-          }}>
-            🌐 {i18n.language === 'ar' ? 'EN' : 'عربي'}
+        <div className="header-left" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+          <span className={`status-dot ${isConnected ? 'online' : 'offline'}`}></span>
+          <button className="notif-btn" onClick={() => { setShowNotifications(!showNotifications); if (!showNotifications) markAllRead(); }}>
+            🔔{unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
           </button>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {currentUser.avatarUrl && (
-              <img src={currentUser.avatarUrl} alt="" style={{ width: 32, height: 32, borderRadius: '50%' }} />
-            )}
-            <span style={{ fontSize: 14, color: '#444' }}>{currentUser.name}</span>
-            <button
-              onClick={handleLogout}
-              style={{ background: 'none', border: '1px solid #ddd', borderRadius: 8, padding: '4px 12px', cursor: 'pointer', fontSize: 13, color: '#666' }}
-            >
-              {t('common.logout')}
-            </button>
-          </div>
+          <button onClick={toggleLanguage} className="lang-btn">🌐 {i18n.language === 'ar' ? 'EN' : 'عربي'}</button>
+          <button onClick={handleLogout} className="logout-btn">{t('common.logout')}</button>
         </div>
       </header>
 
       <main className="main">
         {page === 'dashboard' && <Dashboard stats={stats} notifications={notifications} orders={orders} products={products} />}
-        {page === 'products' && <Products {...{ products } as any} />}
+        {page === 'products' && <Products products={products} />}
         {page === 'orders' && <Orders orders={orders} products={products} />}
         {page === 'pos' && <POS />}
         {page === 'suppliers' && <Suppliers />}
-        {page === 'settings' && <Settings storeName={storeName} onStoreNameChange={(name) => { setStoreName(name); }} />}
+        {page === 'settings' && <Settings storeName={storeName} onStoreNameChange={setStoreName} />}
       </main>
     </div>
   );
