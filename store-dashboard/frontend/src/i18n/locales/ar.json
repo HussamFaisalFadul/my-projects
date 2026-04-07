@@ -161,7 +161,8 @@
     "value": "القيمة",
     "addAttributeHint": "اضغط '+ سمة' لإضافة خاصية كاللون أو المقاس",
     "noVariantsYet": "لا توجد متغيرات بعد. اضغط '+ أضف متغير' للبدء.",
-    "uploadingImages": "جاري رفع الصور..."
+    "uploadingImages": "جاري رفع الصور...",
+    "discount": "خصم"
   },
   "orders": {
     "title": "الطلبات",
