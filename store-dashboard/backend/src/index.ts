@@ -8,7 +8,6 @@ import authRouter from './auth/routes';
 import storesRouter from './stores/routes';
 import posRouter from './pos/routes';
 import suppliersRouter from './suppliers/routes';
-import publicRouter from './public/routes'; // <-- إضافة المسارات العامة
 import { authMiddleware } from './auth/auth';
 import {
   getProducts,
@@ -34,6 +33,7 @@ import {
 import { getMemberRole } from './stores/queries';
 import { analyzeInventory, generateDailyReport } from './ai';
 import { ServerToClientEvents, ClientToServerEvents } from './types';
+import pool from './db/connection'; // استيراد pool بشكل ثابت
 
 const app = express();
 const httpServer = createServer(app);
@@ -42,28 +42,18 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
   cors: { origin: '*', methods: ['GET', 'POST'] },
 });
 
-// تخزين io في app لاستخدامه في الـ routes
 app.set('io', io);
 
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.use(passport.initialize());
 
-// ===== المصادقة والمتاجر =====
-app.use('/auth', authRouter);
-app.use('/stores', storesRouter);
-app.use('/pos', posRouter);
-app.use('/suppliers', suppliersRouter);
-app.use('/api/public', publicRouter); // <-- إضافة مسارات API العامة
-
-// ===== مسارات API العامة (بدون توكن) - تضاف هنا كضمان =====
-// جلب متجر بواسطة slug مع منتجاته
+// ===== مسارات API العامة (بدون توكن) =====
+// جلب متجر بواسطة slug
 app.get('/api/public/stores/:slug', async (req, res) => {
+  console.log('📢 GET /api/public/stores/:slug', req.params.slug);
   try {
     const { slug } = req.params;
-    const pool = (await import('./db/connection')).default;
-
-    // جلب المتجر
     const storeResult = await pool.query(
       `SELECT id, name, description, logo_url, owner_id FROM stores WHERE slug = $1`,
       [slug]
@@ -72,8 +62,6 @@ app.get('/api/public/stores/:slug', async (req, res) => {
       return res.status(404).json({ error: 'المتجر غير موجود' });
     }
     const store = storeResult.rows[0];
-
-    // جلب المنتجات النشطة والتي لها كمية > 0
     const productsResult = await pool.query(
       `SELECT id, name, price, quantity, image_url, description, category 
        FROM products 
@@ -82,7 +70,6 @@ app.get('/api/public/stores/:slug', async (req, res) => {
       [store.id]
     );
     store.products = productsResult.rows;
-
     res.json(store);
   } catch (err: any) {
     console.error('❌ خطأ في جلب المتجر العام:', err);
@@ -90,9 +77,10 @@ app.get('/api/public/stores/:slug', async (req, res) => {
   }
 });
 
-// إنشاء طلب جديد من العميل (بدون توكن)
+// إنشاء طلب جديد (بدون توكن)
 app.post('/api/public/orders', async (req, res) => {
-  const client = await (await import('./db/connection')).default.connect();
+  console.log('📢 POST /api/public/orders');
+  const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const { storeId, customerName, customerPhone, items, totalPrice, notes } = req.body;
@@ -121,7 +109,7 @@ app.post('/api/public/orders', async (req, res) => {
 
     await client.query('COMMIT');
 
-    // إرسال إشعار WebSocket
+    // إشعار WebSocket
     const io = req.app.get('io');
     if (io) {
       io.to(storeId).emit('order_added', order);
@@ -132,7 +120,6 @@ app.post('/api/public/orders', async (req, res) => {
       });
     }
 
-    // إضافة إشعار في قاعدة البيانات
     await addNotification(
       storeId,
       'طلب_جديد',
@@ -150,7 +137,17 @@ app.post('/api/public/orders', async (req, res) => {
   }
 });
 
-// ===== باقي المسارات (تحتاج توكن وميدلوير المتجر) =====
+// ===== باقي المسارات (تحتاج توكن) =====
+// ... (باقي الكود كما هو، بدءاً من app.use('/auth', authRouter) إلخ)
+// تأكد من عدم وجود تعارض في المسارات.
+
+// ===== المصادقة والمتاجر =====
+app.use('/auth', authRouter);
+app.use('/stores', storesRouter);
+app.use('/pos', posRouter);
+app.use('/suppliers', suppliersRouter);
+
+// ===== ميدلوير التحقق من المتجر =====
 async function requireStore(req: any, res: any, next: any) {
   const storeId = req.headers['x-store-id'] as string;
   if (!storeId) return res.status(400).json({ error: 'معرف المتجر مطلوب' });
@@ -161,7 +158,7 @@ async function requireStore(req: any, res: any, next: any) {
   next();
 }
 
-// ===== API المنتجات =====
+// ===== API المنتجات (تتطلب توكن ومتجر) =====
 app.get('/api/products', authMiddleware, requireStore, async (req: any, res) => {
   try { res.json(await getProducts(req.storeId)); }
   catch (err: any) { res.status(500).json({ error: err.message }); }
@@ -311,7 +308,7 @@ app.post('/api/products/:id/movements', authMiddleware, requireStore, async (req
   }
 });
 
-// ===== API الطلبات (بدون ازدواجية حركات المخزون) =====
+// ===== API الطلبات =====
 app.get('/api/orders', authMiddleware, requireStore, async (req: any, res) => {
   try { res.json(await getOrders(req.storeId)); }
   catch (err: any) { res.status(500).json({ error: err.message }); }
@@ -325,7 +322,7 @@ app.post('/api/orders', authMiddleware, requireStore, async (req: any, res) => {
     const n = await addNotification(req.storeId, 'طلب_جديد', `طلب جديد من ${order.customerName} — ${order.totalPrice} ريال`);
     io.to(req.storeId).emit('notification', n);
 
-    // فقط إشعارات تحذير المخزون المنخفض (بدون تسجيل حركة مكررة)
+    // إشعارات تحذير المخزون المنخفض (بدون تسجيل حركة مكررة)
     for (const item of order.items) {
       const product = await getProductById(item.productId);
       if (product) {
@@ -380,7 +377,7 @@ app.get('/api/report', authMiddleware, requireStore, async (req: any, res) => {
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
-// ===== ويب سوكيتس — غرف المتاجر =====
+// ===== ويب سوكيتس =====
 io.on('connection', (socket) => {
   socket.on('join_store', (storeId: string) => {
     socket.join(storeId);
