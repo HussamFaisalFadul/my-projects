@@ -54,10 +54,7 @@ export async function createStore(
 }
 
 export async function getStoreById(storeId: string): Promise<Store | null> {
-  const result = await pool.query(
-    'SELECT * FROM stores WHERE id = $1',
-    [storeId]
-  );
+  const result = await pool.query('SELECT * FROM stores WHERE id = $1', [storeId]);
   return result.rows[0] ? mapStore(result.rows[0]) : null;
 }
 
@@ -103,10 +100,7 @@ export async function getStoreMembers(storeId: string): Promise<StoreMember[]> {
   return result.rows.map(mapMember);
 }
 
-export async function getMemberRole(
-  storeId: string,
-  userId: string
-): Promise<string | null> {
+export async function getMemberRole(storeId: string, userId: string): Promise<string | null> {
   const result = await pool.query(
     'SELECT role FROM store_members WHERE store_id = $1 AND user_id = $2',
     [storeId, userId]
@@ -114,10 +108,7 @@ export async function getMemberRole(
   return result.rows[0]?.role || null;
 }
 
-export async function removeMember(
-  storeId: string,
-  userId: string
-): Promise<boolean> {
+export async function removeMember(storeId: string, userId: string): Promise<boolean> {
   const result = await pool.query(
     'DELETE FROM store_members WHERE store_id = $1 AND user_id = $2 AND role != $3',
     [storeId, userId, 'مالك']
@@ -125,11 +116,7 @@ export async function removeMember(
   return (result.rowCount ?? 0) > 0;
 }
 
-export async function updateMemberRole(
-  storeId: string,
-  userId: string,
-  role: string
-): Promise<boolean> {
+export async function updateMemberRole(storeId: string, userId: string, role: string): Promise<boolean> {
   const result = await pool.query(
     `UPDATE store_members SET role = $1
      WHERE store_id = $2 AND user_id = $3 AND role != 'مالك'`,
@@ -230,7 +217,7 @@ function mapStore(row: any): Store {
   return {
     id: row.id,
     name: row.name,
-    slug: row.slug, // أضف هذا السطر
+    slug: row.slug, // ⬅️ أضف هذا السطر
     description: row.description,
     logoUrl: row.logo_url,
     ownerId: row.owner_id,
@@ -247,13 +234,15 @@ function mapMember(row: any): StoreMember {
     role: row.role,
     invitedBy: row.invited_by,
     joinedAt: row.joined_at,
-    user: row.user_name ? {
-      id: row.user_id,
-      name: row.user_name,
-      email: row.user_email,
-      role: row.role,
-      avatarUrl: row.avatar_url,
-    } : undefined,
+    user: row.user_name
+      ? {
+          id: row.user_id,
+          name: row.user_name,
+          email: row.user_email,
+          role: row.role,
+          avatarUrl: row.avatar_url,
+        }
+      : undefined,
   };
 }
 
