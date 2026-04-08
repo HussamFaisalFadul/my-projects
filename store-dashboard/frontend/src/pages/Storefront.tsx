@@ -3,13 +3,20 @@ import './Storefront.css';
 
 const BACKEND = 'https://store-dashboard-backend.onrender.com';
 
-// أيقونات SVG مدمجة (لا تحتاج لمكتبات)
+// أيقونات SVG مدمجة - لا تعتمد على مكتبات خارجية نهائياً
 const Icons = {
-  Cart: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>,
-  Trash: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
-  X: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
-  Plus: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
-  Minus: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  Cart: () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+  ),
+  Plus: () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  ),
+  X: () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  ),
+  Trash: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+  )
 };
 
 export default function Storefront() {
@@ -18,10 +25,8 @@ export default function Storefront() {
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<any[]>([]);
   const [showCart, setShowCart] = useState(false);
-  const [orderStatus, setOrderStatus] = useState<'idle'|'sending'|'success'>('idle');
-
-  // حقول العميل
   const [customer, setCustomer] = useState({ name: '', phone: '', address: '' });
+  const [orderStatus, setOrderStatus] = useState<'idle'|'sending'|'success'>('idle');
 
   useEffect(() => {
     if (!slug) return;
@@ -34,7 +39,6 @@ export default function Storefront() {
       .catch(() => setLoading(false));
   }, [slug]);
 
-  // الحسابات البرمجية
   const totalPrice = useMemo(() => cart.reduce((sum, item) => sum + (item.price * item.cartQuantity), 0), [cart]);
   const totalItems = useMemo(() => cart.reduce((sum, item) => sum + item.cartQuantity, 0), [cart]);
 
@@ -47,14 +51,9 @@ export default function Storefront() {
     setShowCart(true);
   };
 
-  const updateQty = (id: string, delta: number) => {
-    setCart(prev => prev.map(p => p.id === id ? {...p, cartQuantity: Math.max(1, p.cartQuantity + delta)} : p));
-  };
-
   const submitOrder = async () => {
-    if (!customer.name || !customer.phone) return alert('يرجى ملء البيانات');
+    if (!customer.name || !customer.phone) return alert('يرجى إكمال البيانات');
     setOrderStatus('sending');
-    
     try {
       const res = await fetch(`${BACKEND}/api/public/orders`, {
         method: 'POST',
@@ -70,20 +69,16 @@ export default function Storefront() {
       });
       if (res.ok) {
         setOrderStatus('success');
-        const waMsg = `طلب جديد من: ${customer.name}\nالمجموع: ${totalPrice} ريال`;
-        window.open(`https://wa.me/${store.owner_phone}?text=${encodeURIComponent(waMsg)}`, '_blank');
+        window.open(`https://wa.me/${store.owner_phone}?text=${encodeURIComponent('طلب جديد من المتجر')}`, '_blank');
         setCart([]);
       }
-    } catch (err) {
-      setOrderStatus('idle');
-    }
+    } catch { setOrderStatus('idle'); }
   };
 
   if (loading) return <div className="loader">جاري التحميل...</div>;
 
   return (
     <div className="store-container" dir="rtl">
-      {/* Header */}
       <nav className="store-nav">
         <div className="nav-content">
           <div className="store-info">
@@ -97,32 +92,21 @@ export default function Storefront() {
         </div>
       </nav>
 
-      {/* Hero */}
-      <header className="store-hero">
-        <p>{store?.description}</p>
-      </header>
-
-      {/* Grid */}
       <div className="product-grid">
         {store?.products?.map((p: any) => (
           <div key={p.id} className="p-card">
-            <div className="p-img-box">
-               <img src={p.image_url} alt={p.name} />
-            </div>
+            <img src={p.image_url} alt={p.name} className="p-img" />
             <div className="p-info">
               <h3>{p.name}</h3>
               <div className="p-footer">
                 <span className="p-price">{p.price} ر.س</span>
-                <button onClick={() => addToCart(p)} className="add-btn">
-                   <Icons.Plus /> إضافة
-                </button>
+                <button onClick={() => addToCart(p)} className="add-btn">إضافة</button>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Cart Drawer */}
       {showCart && (
         <div className="drawer-overlay">
           <div className="drawer-content">
@@ -130,18 +114,12 @@ export default function Storefront() {
               <h2>سلة المشتريات</h2>
               <button onClick={() => setShowCart(false)}><Icons.X /></button>
             </div>
-
             <div className="cart-list">
               {cart.map(item => (
                 <div key={item.id} className="cart-item">
-                  <img src={item.image_url} width="60" />
                   <div className="item-meta">
                     <h4>{item.name}</h4>
-                    <div className="qty-row">
-                       <button onClick={() => updateQty(item.id, -1)}><Icons.Minus /></button>
-                       <span>{item.cartQuantity}</span>
-                       <button onClick={() => updateQty(item.id, 1)}><Icons.Plus /></button>
-                    </div>
+                    <span>الكمية: {item.cartQuantity}</span>
                   </div>
                   <button className="del-btn" onClick={() => setCart(c => c.filter(i => i.id !== item.id))}>
                     <Icons.Trash />
@@ -149,18 +127,12 @@ export default function Storefront() {
                 </div>
               ))}
             </div>
-
             {cart.length > 0 && (
               <div className="checkout-form">
-                <div className="total-row">
-                  <span>الإجمالي:</span>
-                  <strong>{totalPrice} ريال</strong>
-                </div>
+                <p>الإجمالي: {totalPrice} ر.س</p>
                 <input placeholder="الاسم" onChange={e => setCustomer({...customer, name: e.target.value})} />
                 <input placeholder="رقم الجوال" onChange={e => setCustomer({...customer, phone: e.target.value})} />
-                <button onClick={submitOrder} disabled={orderStatus === 'sending'} className="order-btn">
-                  {orderStatus === 'success' ? 'تم الطلب ✅' : 'إتمام الطلب'}
-                </button>
+                <button onClick={submitOrder} className="order-btn">إتمام الطلب</button>
               </div>
             )}
           </div>
