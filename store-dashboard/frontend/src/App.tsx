@@ -222,28 +222,30 @@ export default function App() {
           </nav>
         </div>
 
-        <div className="header-left" style={{ display: 'flex', gap: '15px', alignItems: 'center', position: 'relative' }}>
-          <div className="connected-users">
-            <span className={`status-dot ${isConnected ? 'online' : 'offline'}`}></span>
-            <span>{isConnected ? t('common.connected') : t('common.disconnected')}</span>
+        <div className="header-left" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {/* حالة الاتصال */}
+          <div className="connected-users" style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', padding: '6px 12px', borderRadius: '30px' }}>
+            <span className={`status-dot ${isConnected ? 'online' : 'offline'}`} style={{ width: 8, height: 8, borderRadius: '50%', background: isConnected ? '#22c55e' : '#ef4444' }}></span>
+            <span style={{ fontSize: 13, color: '#334155' }}>{isConnected ? t('common.connected') : t('common.disconnected')}</span>
           </div>
 
+          {/* أيقونة الإشعارات */}
           <div className="notif-wrapper" style={{ position: 'relative' }}>
-            <button className="notif-btn" onClick={() => { setShowNotifications(!showNotifications); if (!showNotifications) markAllRead(); }}>
-              🔔{unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+            <button className="notif-btn" onClick={() => { setShowNotifications(!showNotifications); if (!showNotifications) markAllRead(); }} style={{ background: '#f1f5f9', border: 'none', borderRadius: '30px', padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '18px' }}>
+              🔔{unreadCount > 0 && <span className="notif-badge" style={{ position: 'absolute', top: -2, right: -2, background: '#ef4444', color: 'white', fontSize: 10, width: 18, height: 18, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unreadCount}</span>}
             </button>
             {showNotifications && (
-              <div className="notif-panel">
-                <div className="notif-header">{t('notifications.title')}</div>
+              <div className="notif-panel" style={{ position: 'absolute', left: 0, top: 45, width: 320, background: 'white', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 200, overflow: 'hidden' }}>
+                <div className="notif-header" style={{ padding: '12px 16px', fontWeight: 700, borderBottom: '1px solid #f0f0f0' }}>{t('notifications.title')}</div>
                 {notifications.length === 0 ? (
-                  <div className="notif-empty">{t('notifications.noNotifications')}</div>
+                  <div className="notif-empty" style={{ padding: '20px', textAlign: 'center', color: '#888' }}>{t('notifications.noNotifications')}</div>
                 ) : (
                   notifications.slice(0, 10).map(n => {
                     const timeValue = (n as any).createdAt ?? (n as any).created_at;
                     return (
-                      <div key={n.id} className={`notif-item ${n.type === 'تحذير_مخزون' ? 'warning' : n.type === 'طلب_جديد' ? 'info' : 'success'}`}>
-                        <div className="notif-msg">{n.message}</div>
-                        <div className="notif-time">{timeValue ? new Date(timeValue).toLocaleTimeString('ar-SA') : '--:--'}</div>
+                      <div key={n.id} className={`notif-item ${n.type === 'تحذير_مخزون' ? 'warning' : n.type === 'طلب_جديد' ? 'info' : 'success'}`} style={{ padding: '10px 16px', borderBottom: '1px solid #f5f5f5', borderRight: '3px solid transparent' }}>
+                        <div className="notif-msg" style={{ fontSize: 13, marginBottom: 4 }}>{n.message}</div>
+                        <div className="notif-time" style={{ fontSize: 11, color: '#999' }}>{timeValue ? new Date(timeValue).toLocaleTimeString('ar-SA') : '--:--'}</div>
                       </div>
                     );
                   })
@@ -252,11 +254,44 @@ export default function App() {
             )}
           </div>
 
-          <button onClick={toggleLanguage} className="lang-btn" style={{ background: 'rgba(0,0,0,0.05)', padding: '6px 12px', borderRadius: 20 }}>
-            🌐 {i18n.language === 'ar' ? 'EN' : 'عربي'}
+          {/* زر تبديل اللغة */}
+          <button onClick={toggleLanguage} style={{
+            background: '#f1f5f9',
+            border: 'none',
+            borderRadius: '30px',
+            padding: '8px 16px',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: 500,
+            color: '#1e293b',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
+          onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'}>
+            🌐 {i18n.language === 'ar' ? 'English' : 'العربية'}
           </button>
-          <button onClick={handleLogout} className="logout-btn" style={{ background: 'none', border: '1px solid #ddd', padding: '6px 12px', borderRadius: 8 }}>
-            {t('common.logout')}
+
+          {/* زر تسجيل الخروج */}
+          <button onClick={handleLogout} style={{
+            background: '#fee2e2',
+            border: 'none',
+            borderRadius: '30px',
+            padding: '8px 16px',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: 500,
+            color: '#b91c1c',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = '#fecaca'}
+          onMouseLeave={e => e.currentTarget.style.background = '#fee2e2'}>
+            🚪 {t('common.logout')}
           </button>
         </div>
       </header>
