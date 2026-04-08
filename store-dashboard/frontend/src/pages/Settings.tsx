@@ -1,70 +1,319 @@
-import { useEffect, useState } from 'react';
-import './Storefront.css';
+import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const BACKEND = 'https://store-dashboard-backend.onrender.com';
+const FRONTEND = 'https://my-projects-bv31.vercel.app';
 
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-  image_url?: string;
+function authHeaders() {
+  const token = localStorage.getItem('store_token');
+  const storeId = localStorage.getItem('store_id');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(storeId ? { 'x-store-id': storeId } : {}),
+  };
 }
 
-export default function Storefront() {
-  const slug = window.location.pathname.split('/store/')[1];
-  const [store, setStore] = useState<any>(null);
+interface Member {
+  id: string;
+  userId: string;
+  role: string;
+  joinedAt: string;
+  user?: { name: string; email: string; avatarUrl?: string };
+}
+
+interface Invitation {
+  id: string;
+  email: string;
+  role: string;
+  token: string;
+  expiresAt: string;
+  acceptedAt?: string;
+}
+
+interface Props {
+  storeName: string | null;
+  onStoreNameChange: (name: string) => void;
+}
+
+export default function Settings({ storeName, onStoreNameChange }: Props) {
+  const { t } = useTranslation();
+  const [members, setMembers] = useState<Member[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState(t('settings.employee'));
+  const [inviting, setSending] = useState(false);
+  const [inviteError, setInviteError] = useState('');
+  const [inviteSuccess, setInviteSuccess] = useState('');
+  const [copiedToken, setCopiedToken] = useState('');
+  const [editingName, setEditingName] = useState(false);
+  const [newName, setNewName] = useState(storeName || '');
+  const [savingName, setSavingName] = useState(false);
+
+  // حالة slug المتجر
+  const [storeSlug, setStoreSlug] = useState('');
+  const [storeLink, setStoreLink] = useState('');
+
+  const storeId = localStorage.getItem('store_id');
 
   useEffect(() => {
-    if (!slug) {
-      setError('رابط غير صحيح');
-      setLoading(false);
-      return;
-    }
-    fetch(`${BACKEND}/api/public/stores/${slug}`)
-      .then(res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then(data => {
-        if (data.error) throw new Error(data.error);
-        setStore(data);
-      })
-      .catch(err => {
-        console.error(err);
-        setError(err.message);
-      })
-      .finally(() => setLoading(false));
-  }, [slug]);
+    loadData();
+    loadStoreSlug(); // جلب slug المتجر
+  }, []);
 
-  if (loading) return <div className="storefront-loading">جاري تحميل المتجر...</div>;
-  if (error) return <div className="storefront-error">حدث خطأ: {error}</div>;
-  if (!store) return <div className="storefront-error">المتجر غير موجود</div>;
+  const loadData = async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const [membersRes, invitationsRes] = await Promise.all([
+        fetch(`${BACKEND}/stores/${storeId}/members`, { headers: authHeaders() }),
+        fetch(`${BACKEND}/stores/${storeId}/invitations`, { headers: authHeaders() }),
+      ]);
+      const [m, i] = await Promise.all([membersRes.json(), invitationsRes.json()]);
+      setMembers(Array.isArray(m) ? m : []);
+      setInvitations(Array.isArray(i) ? i : []);
+    } catch {}
+    setLoading(false);
+  };
+
+  const loadStoreSlug = async () => {
+    if (!storeId) return;
+    try {
+      const res = await fetch(`${BACKEND}/stores/${storeId}`, { headers: authHeaders() });
+      const data = await res.json();
+      if (data.slug) {
+        setStoreSlug(data.slug);
+        setStoreLink(`${window.location.origin}/store/${data.slug}`);
+      }
+    } catch (err) {
+      console.error('فشل جلب slug المتجر', err);
+    }
+  };
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) { setInviteError(t('settings.enterEmail')); return; }
+    setSending(true);
+    setInviteError('');
+    setInviteSuccess('');
+    try {
+      const res = await fetch(`${BACKEND}/stores/${storeId}/invitations`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setInviteError(data.error || t('common.errorOccurred')); }
+      else {
+        setInviteSuccess(`${t('settings.inviteCreated')} ${inviteEmail}`);
+        setInviteEmail('');
+        loadData();
+      }
+    } catch { setInviteError(t('common.connectionError')); }
+    setSending(false);
+  };
+
+  const copyInviteLink = (token: string) => {
+    const link = `${FRONTEND}/join/${token}`;
+    navigator.clipboard.writeText(link);
+    setCopiedToken(token);
+    setTimeout(() => setCopiedToken(''), 2000);
+  };
+
+  const handleRemoveMember = async (userId: string) => {
+    if (!confirm(t('settings.confirmRemoveMember'))) return;
+    await fetch(`${BACKEND}/stores/${storeId}/members/${userId}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    loadData();
+  };
+
+  const handleSaveName = async () => {
+    if (!newName.trim()) return;
+    setSavingName(true);
+    try {
+      const res = await fetch(`${BACKEND}/stores/${storeId}`, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify({ name: newName.trim() }),
+      });
+      const data = await res.json();
+      if (data.name) {
+        localStorage.setItem('store_name', data.name);
+        onStoreNameChange(data.name);
+        setEditingName(false);
+        loadStoreSlug(); // تحديث slug بعد تغيير الاسم
+      }
+    } catch {}
+    setSavingName(false);
+  };
+
+  const roleColor = (role: string) => {
+    if (role === t('settings.owner')) return '#7c3aed';
+    if (role === t('settings.manager')) return '#2563eb';
+    return '#059669';
+  };
+
+  if (loading) return <div className="page"><div className="empty">{t('common.loading')}</div></div>;
 
   return (
-    <div className="storefront" dir="rtl">
-      <div className="storefront-header">
-        <div className="store-logo">
-          {store.logo_url ? <img src={store.logo_url} alt={store.name} /> : <span>🏪</span>}
-          <h1>{store.name}</h1>
-        </div>
-      </div>
-      {store.description && <p className="store-description">{store.description}</p>}
-      <div className="products-grid">
-        {store.products && store.products.length > 0 ? (
-          store.products.map((product: Product) => (
-            <div key={product.id} className="product-card">
-              {product.image_url && <img src={product.image_url} alt={product.name} />}
-              <h3>{product.name}</h3>
-              <p className="price">{product.price} ريال</p>
-              <p className="stock">المتبقي: {product.quantity}</p>
-            </div>
-          ))
+    <div className="page" dir="rtl">
+      <div className="page-title">⚙️ {t('settings.title')}</div>
+
+      {/* اسم المتجر */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card-title">{t('settings.storeName')}</div>
+        {editingName ? (
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <input
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              style={{ flex: 1, padding: '10px 14px', borderRadius: 8, border: '1px solid #ddd', fontSize: 15 }}
+              onKeyDown={e => e.key === 'Enter' && handleSaveName()}
+            />
+            <button
+              onClick={handleSaveName}
+              disabled={savingName}
+              style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+            >
+              {savingName ? t('common.saving') : t('common.save')}
+            </button>
+            <button
+              onClick={() => setEditingName(false)}
+              style={{ padding: '10px 16px', background: 'none', border: '1px solid #ddd', borderRadius: 8, cursor: 'pointer' }}
+            >
+              {t('common.cancel')}
+            </button>
+          </div>
         ) : (
-          <p className="no-products">لا توجد منتجات متاحة حالياً</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+            <span style={{ fontSize: 18, fontWeight: 600 }}>🏪 {storeName}</span>
+            <button
+              onClick={() => { setNewName(storeName || ''); setEditingName(true); }}
+              style={{ padding: '6px 14px', background: 'none', border: '1px solid #ddd', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}
+            >
+              {t('common.edit')}
+            </button>
+          </div>
         )}
+      </div>
+
+      {/* رابط المتجر العام */}
+      {storeLink && (
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div className="card-title">🌐 {t('settings.publicStoreLink') || 'رابط متجرك العام'}</div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <input
+              type="text"
+              readOnly
+              value={storeLink}
+              style={{ flex: 1, padding: '10px 14px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, background: '#f8f9fa' }}
+            />
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(storeLink);
+                alert('تم نسخ الرابط بنجاح');
+              }}
+              style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+            >
+              📋 نسخ الرابط
+            </button>
+          </div>
+          <p style={{ fontSize: 12, color: '#666', marginTop: 8 }}>
+            يمكنك مشاركة هذا الرابط مع عملائك لزيارة متجرك الإلكتروني وطلب المنتجات مباشرة.
+          </p>
+        </div>
+      )}
+
+      {/* دعوة عضو جديد */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card-title">➕ {t('settings.inviteMember')}</div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+          <input
+            value={inviteEmail}
+            onChange={e => setInviteEmail(e.target.value)}
+            placeholder={t('settings.emailPlaceholder')}
+            type="email"
+            style={{ flex: 1, minWidth: 200, padding: '10px 14px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
+            onKeyDown={e => e.key === 'Enter' && handleInvite()}
+          />
+          <select
+            value={inviteRole}
+            onChange={e => setInviteRole(e.target.value)}
+            style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
+          >
+            <option>{t('settings.employee')}</option>
+            <option>{t('settings.manager')}</option>
+          </select>
+          <button
+            onClick={handleInvite}
+            disabled={inviting}
+            style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}
+          >
+            {inviting ? t('settings.sending') : t('settings.createInvite')}
+          </button>
+        </div>
+        {inviteError && <div style={{ color: 'red', marginTop: 8, fontSize: 13 }}>{inviteError}</div>}
+        {inviteSuccess && <div style={{ color: '#059669', marginTop: 8, fontSize: 13 }}>✅ {inviteSuccess}</div>}
+      </div>
+
+      {/* الدعوات المعلقة */}
+      {invitations.filter(i => !i.acceptedAt).length > 0 && (
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div className="card-title">📨 {t('settings.pendingInvites')}</div>
+          {invitations.filter(i => !i.acceptedAt).map(inv => (
+            <div key={inv.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f3f4f6' }}>
+              <div>
+                <div style={{ fontWeight: 500 }}>{inv.email}</div>
+                <div style={{ fontSize: 12, color: '#888' }}>
+                  {inv.role} · {t('settings.expires')} {new Date(inv.expiresAt).toLocaleDateString('ar-SA')}
+                </div>
+              </div>
+              <button
+                onClick={() => copyInviteLink(inv.token)}
+                style={{ padding: '6px 14px', background: copiedToken === inv.token ? '#059669' : '#f3f4f6', color: copiedToken === inv.token ? 'white' : '#444', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}
+              >
+                {copiedToken === inv.token ? t('settings.copied') : t('settings.copyLink')}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* الأعضاء */}
+      <div className="card">
+        <div className="card-title">👥 {t('settings.members')} ({members.length})</div>
+        {members.map(member => (
+          <div key={member.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f3f4f6' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {member.user?.avatarUrl ? (
+                <img src={member.user.avatarUrl} alt="" style={{ width: 36, height: 36, borderRadius: '50%' }} />
+              ) : (
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>
+                  👤
+                </div>
+              )}
+              <div>
+                <div style={{ fontWeight: 500 }}>{member.user?.name || t('settings.user')}</div>
+                <div style={{ fontSize: 12, color: '#888' }}>{member.user?.email}</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: roleColor(member.role) + '20', color: roleColor(member.role) }}>
+                {member.role}
+              </span>
+              {member.role !== t('settings.owner') && (
+                <button
+                  onClick={() => handleRemoveMember(member.userId)}
+                  style={{ padding: '4px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}
+                >
+                  {t('settings.remove')}
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
