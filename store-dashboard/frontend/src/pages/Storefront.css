@@ -262,7 +262,7 @@ body {
   color: #888;
 }
 
-/* تحسين شكل السكرول بار */
+/* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
 }
