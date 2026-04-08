@@ -5,7 +5,6 @@ export default defineConfig({
   plugins: [react()],
   build: {
     rollupOptions: {
-      // هذا السطر سيخبر Vite: "حتى لو وجدت أحداً يطلب lucide، تجاهله ولا توقف الـ Build"
       external: ['lucide-react'],
     },
   },
