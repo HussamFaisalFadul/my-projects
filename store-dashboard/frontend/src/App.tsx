@@ -33,7 +33,7 @@ export default function App() {
   const [storeError, setStoreError] = useState('');
   const [initializing, setInitializing] = useState(true);
 
-  // إدارة التوثيق والمخزن
+  // إدارة التوثيق
   const [token, setToken] = useState<string | null>(localStorage.getItem('store_token'));
   const [currentUser, setCurrentUser] = useState<any>(
     JSON.parse(localStorage.getItem('store_user') || 'null')
@@ -50,11 +50,11 @@ export default function App() {
     i18n.changeLanguage(newLang);
   };
 
-  // التعامل مع روابط المتجر الخارجي أو الانضمام
+  // معالجة الروابط الخارجية
   if (window.location.pathname.startsWith('/join/')) return <JoinPage />;
   if (window.location.pathname.startsWith('/store/')) return <Storefront />;
 
-  // تهيئة التطبيق والتحقق من التوكن والمخازن
+  // منطق تهيئة المتجر والتوثيق
   useEffect(() => {
     const savedToken = localStorage.getItem('store_token');
     const savedStoreId = localStorage.getItem('store_id');
@@ -116,7 +116,6 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    if (!window.confirm(t('common.confirmLogout'))) return;
     localStorage.clear();
     setToken(null);
     setCurrentUser(null);
@@ -139,8 +138,6 @@ export default function App() {
         localStorage.setItem('store_name', store.name);
         setCurrentStoreId(store.id);
         setStoreName(store.name);
-      } else if ((store as any).error) {
-        setStoreError((store as any).error || t('common.errorOccurred'));
       }
     } catch {
       setStoreError(t('common.connectionError'));
@@ -148,14 +145,12 @@ export default function App() {
     setCreatingStore(false);
   };
 
-  // الإشعارات
   const unreadCount = notifications.filter(n => !n.read).length;
   const markAllRead = useCallback(() => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    api.markNotificationsRead().catch(() => {});
   }, []);
 
-  // جلب البيانات الأولية
+  // جلب البيانات الأساسية
   useEffect(() => {
     if (!token || !currentStoreId) return;
     api.getProducts().then(setProducts).catch(() => {});
@@ -164,167 +159,110 @@ export default function App() {
     api.getNotifications().then(setNotifications).catch(() => {});
   }, [token, currentStoreId]);
 
-  // Socket.io الأحداث الحية
+  // الربط الحي (Sockets)
   useEffect(() => {
     if (!currentStoreId) return;
     socket.emit('join_store', currentStoreId);
-    
-    const onConnect = () => setIsConnected(true);
-    const onDisconnect = () => setIsConnected(false);
-    
-    socket.on('connect', onConnect);
-    socket.on('disconnect', onDisconnect);
+    socket.on('connect', () => setIsConnected(true));
+    socket.on('disconnect', () => setIsConnected(false));
     setIsConnected(socket.connected);
 
-    socket.on('product_added', (p) => setProducts(prev => [...prev, p]));
-    socket.on('product_updated', (p) => setProducts(prev => prev.map(old => old.id === p.id ? p : old)));
-    socket.on('product_deleted', (id) => setProducts(prev => prev.filter(p => p.id !== id)));
-    socket.on('order_added', (o) => {
-      setOrders(prev => [o, ...prev]);
-      // تنبيه صوتي بسيط عند طلب جديد يمكن إضافته هنا
-    });
-    socket.on('order_updated', (o) => setOrders(prev => prev.map(old => old.id === o.id ? o : old)));
+    socket.on('order_added', (o) => setOrders(prev => [o, ...prev]));
+    socket.on('notification', (n) => setNotifications(prev => [n, ...prev]));
     socket.on('stats_updated', setStats);
-    socket.on('notification', (n) => setNotifications(prev => [n, ...prev].slice(0, 50)));
 
     return () => {
       socket.emit('leave_store', currentStoreId);
-      socket.off('connect', onConnect);
-      socket.off('disconnect', onDisconnect);
-      socket.off('product_added'); socket.off('product_updated'); socket.off('product_deleted');
-      socket.off('order_added'); socket.off('order_updated');
-      socket.off('stats_updated'); socket.off('notification');
+      socket.off('connect'); socket.off('disconnect');
+      socket.off('order_added'); socket.off('notification'); socket.off('stats_updated');
     };
   }, [currentStoreId]);
 
-  if (initializing) return <div className="loading-screen"><div className="loading-spinner"></div><p>{t('common.loading')}</p></div>;
-  
+  if (initializing) return <div className="loading-screen">...</div>;
   if (!token || !currentUser) return <Login onLogin={handleLogin} />;
 
-  // واجهة إنشاء مخزن إذا لم يوجد
+  // شاشة إنشاء متجر إذا كان المستخدم لا يملك متجراً
   if (!currentStoreId) {
     return (
-      <div className="app" dir="rtl">
-        <header className="header" style={{ justifyContent: 'space-between', padding: '0 2rem' }}>
-          <span style={{ fontWeight: 600, color: '#1e293b' }}>{t('common.welcome')} {currentUser.name}</span>
-          <button onClick={handleLogout} className="logout-btn-simple" style={{ background: '#fee2e2', color: '#b91c1c', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer' }}>
-            {t('common.logout')} 🚪
-          </button>
-        </header>
-        <div className="create-store-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-          <div className="create-store-card" style={{ maxWidth: 440, width: '100%', padding: '2.5rem', textAlign: 'center', background: 'white', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
-            <div style={{ fontSize: '48px', marginBottom: '1rem' }}>🏪</div>
-            <h2 style={{ marginBottom: '0.5rem' }}>{t('common.createStore')}</h2>
-            <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>{t('common.noStoreFound')}</p>
-            <input
-              value={newStoreName}
-              onChange={e => setNewStoreName(e.target.value)}
-              placeholder={t('common.storeNamePlaceholder')}
-              className="input-field"
-              style={{ width: '100%', marginBottom: '1rem', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
-            />
-            {storeError && <div style={{ color: '#ef4444', marginBottom: '1rem', fontSize: '14px' }}>{storeError}</div>}
-            <button onClick={handleCreateStore} disabled={creatingStore} className="primary-btn" style={{ width: '100%', padding: '12px', borderRadius: '8px', background: '#2563eb', color: 'white', border: 'none', fontWeight: 600, cursor: 'pointer' }}>
-              {creatingStore ? t('common.creating') : t('common.createStore')}
-            </button>
-          </div>
+      <div className="create-store-view" dir="rtl">
+        <div className="card">
+          <h2>{t('common.createStore')}</h2>
+          <input value={newStoreName} onChange={e => setNewStoreName(e.target.value)} placeholder="اسم المتجر" />
+          <button onClick={handleCreateStore}>{creatingStore ? '...' : 'إنشاء'}</button>
+          <button onClick={handleLogout} className="text-btn">خروج</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="app" dir={i18n.language === 'ar' ? 'rtl' : 'ltr'}>
-      <header className="header">
-        <div className="header-right">
-          <div className="logo" style={{ fontWeight: 800, fontSize: '20px', color: '#2563eb' }}>
-            🏪 <span style={{ color: '#1e293b' }}>{storeName || t('common.myStore')}</span>
-          </div>
-          <nav className="nav">
-            {['dashboard', 'products', 'orders', 'suppliers', 'pos', 'settings'].map((p) => (
-              <button 
-                key={p} 
-                className={page === p ? 'nav-btn active' : 'nav-btn'} 
-                onClick={() => setPage(p as Page)}
-              >
-                {t(`nav.${p}`)}
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        <div className="header-left">
-          {/* حالة الاتصال الذكية */}
-          <div className="status-pill" title={isConnected ? 'Connected to Live Server' : 'Connecting...'}>
-            <span className={`status-dot ${isConnected ? 'online' : 'offline'}`}></span>
-            <span className="status-text">{isConnected ? t('common.connected') : t('common.connecting')}</span>
-          </div>
-
-          {/* الإشعارات المحسنة */}
-          <div className="notif-wrapper">
-            <button 
-              className={`icon-circle-btn ${unreadCount > 0 ? 'has-unread' : ''}`} 
-              onClick={() => { setShowNotifications(!showNotifications); if (!showNotifications) markAllRead(); }}
-            >
-              🔔
-              {unreadCount > 0 && <span className="notif-badge-new">{unreadCount}</span>}
-            </button>
-            
-            {showNotifications && (
-              <>
-                <div className="notif-overlay" onClick={() => setShowNotifications(false)}></div>
-                <div className="notif-panel-new">
-                  <div className="notif-header-new">
-                    <span>{t('notifications.title')}</span>
-                    <button onClick={() => setShowNotifications(false)}>✕</button>
-                  </div>
-                  <div className="notif-list-new">
-                    {notifications.length === 0 ? (
-                      <div className="notif-empty-state">
-                        <div style={{ fontSize: '24px' }}>📭</div>
-                        <p>{t('notifications.noNotifications')}</p>
-                      </div>
-                    ) : (
-                      notifications.slice(0, 15).map(n => (
-                        <div key={n.id} className={`notif-card ${n.read ? 'read' : 'unread'} ${n.type}`}>
-                          <div className="notif-content">
-                            <p className="notif-message">{n.message}</p>
-                            <span className="notif-time-new">
-                              {n.createdAt ? new Date(n.createdAt).toLocaleTimeString(i18n.language === 'ar' ? 'ar-SA' : 'en-US', { hour: '2-digit', minute: '2-digit' }) : ''}
-                            </span>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+    <div className="app-layout" dir={i18n.language === 'ar' ? 'rtl' : 'ltr'}>
+      {/* القائمة العلوية المحسنة كلياً */}
+      <header className="header-modern">
+        <div className="header-container">
+          
+          <div className="header-right-side">
+            <div className="brand-wrapper">
+              <div className="brand-icon">🏪</div>
+              <div className="brand-info">
+                <span className="brand-name">{storeName}</span>
+                <div className="live-indicator">
+                  <span className={`dot ${isConnected ? 'online' : 'offline'}`}></span>
+                  <span className="dot-text">{isConnected ? 'متصل' : 'جاري الاتصال'}</span>
                 </div>
-              </>
-            )}
+              </div>
+            </div>
+
+            <nav className="main-nav">
+              {['dashboard', 'products', 'orders', 'suppliers', 'pos', 'settings'].map((p) => (
+                <button 
+                  key={p} 
+                  className={`nav-item ${page === p ? 'active' : ''}`} 
+                  onClick={() => setPage(p as Page)}
+                >
+                  {t(`nav.${p}`)}
+                </button>
+              ))}
+            </nav>
           </div>
 
-          {/* لغة النظام */}
-          <button className="lang-toggle-btn" onClick={toggleLanguage}>
-            <span className="lang-icon">🌐</span>
-            <span className="lang-text">{i18n.language === 'ar' ? 'English' : 'العربية'}</span>
-          </button>
+          <div className="header-left-side">
+            <div className="action-group">
+              <div className="notif-wrapper">
+                <button className="action-btn" onClick={() => { setShowNotifications(!showNotifications); if(!showNotifications) markAllRead(); }}>
+                  🔔 {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
+                </button>
+                {showNotifications && (
+                  <div className="notif-dropdown">
+                    <div className="dropdown-header"><h3>التنبيهات</h3></div>
+                    <div className="dropdown-body">
+                      {notifications.length === 0 ? <p>لا يوجد تنبيهات</p> : 
+                        notifications.slice(0,5).map(n => <div key={n.id} className="notif-line">{n.message}</div>)}
+                    </div>
+                  </div>
+                )}
+              </div>
 
-          {/* تسجيل الخروج */}
-          <button className="logout-btn-new" onClick={handleLogout}>
-            <span className="logout-icon">🚪</span>
-            <span className="logout-text">{t('common.logout')}</span>
-          </button>
+              <button className="action-btn lang-btn" onClick={toggleLanguage}>
+                🌐 {i18n.language === 'ar' ? 'English' : 'العربية'}
+              </button>
+
+              <button className="logout-btn-modern" onClick={handleLogout}>
+                🚪 {t('common.logout')}
+              </button>
+            </div>
+          </div>
+
         </div>
       </header>
 
-      <main className="main-content">
-        <div className="page-container">
-          {page === 'dashboard' && <Dashboard stats={stats} notifications={notifications} orders={orders} products={products} />}
-          {page === 'products' && <Products products={products} />}
-          {page === 'orders' && <Orders orders={orders} products={products} />}
-          {page === 'pos' && <POS />}
-          {page === 'suppliers' && <Suppliers />}
-          {page === 'settings' && <Settings storeName={storeName} onStoreNameChange={setStoreName} />}
-        </div>
+      <main className="main-viewport">
+        {page === 'dashboard' && <Dashboard stats={stats} notifications={notifications} orders={orders} products={products} />}
+        {page === 'products' && <Products products={products} />}
+        {page === 'orders' && <Orders orders={orders} products={products} />}
+        {page === 'pos' && <POS />}
+        {page === 'suppliers' && <Suppliers />}
+        {page === 'settings' && <Settings storeName={storeName} onStoreNameChange={setStoreName} />}
       </main>
     </div>
   );
