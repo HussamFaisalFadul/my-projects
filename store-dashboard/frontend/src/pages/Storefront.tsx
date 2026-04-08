@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import './Storefront.css';
 
 const BACKEND = 'https://store-dashboard-backend.onrender.com';
 
