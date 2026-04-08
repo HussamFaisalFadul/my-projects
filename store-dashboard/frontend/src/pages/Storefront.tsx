@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import './Storefront.css'; // سننشئ ملف CSS للتنسيق
+import './Storefront.css';
 
 const BACKEND = 'https://store-dashboard-backend.onrender.com';
 
@@ -34,7 +34,6 @@ export default function Storefront() {
   const [orderStatus, setOrderStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [whatsappLink, setWhatsappLink] = useState('');
 
-  // تحميل بيانات المتجر
   useEffect(() => {
     if (!slug) {
       setError('رابط غير صحيح');
@@ -57,53 +56,64 @@ export default function Storefront() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // تحميل السلة من localStorage
   useEffect(() => {
     const savedCart = localStorage.getItem(`cart_${slug}`);
     if (savedCart) setCart(JSON.parse(savedCart));
   }, [slug]);
 
-  // حفظ السلة في localStorage كلما تغيرت
   useEffect(() => {
     localStorage.setItem(`cart_${slug}`, JSON.stringify(cart));
   }, [cart, slug]);
 
-  // إضافة منتج إلى السلة
+  // ✅ دالة addToCart مع التحقق من المخزون
   const addToCart = (product: Product) => {
+    if (product.quantity === 0) {
+      alert('هذا المنتج غير متوفر حالياً');
+      return;
+    }
     setCart(prev => {
       const existing = prev.find(p => p.id === product.id);
+      const currentQtyInCart = existing ? existing.cartQuantity : 0;
+      const newQty = currentQtyInCart + 1;
+      
+      if (newQty > product.quantity) {
+        alert(`⚠️ لا يمكن إضافة ${newQty} قطع. الحد الأقصى المتاح هو ${product.quantity}.`);
+        return prev;
+      }
+      
       if (existing) {
         return prev.map(p =>
-          p.id === product.id ? { ...p, cartQuantity: p.cartQuantity + 1 } : p
+          p.id === product.id ? { ...p, cartQuantity: newQty } : p
         );
       }
       return [...prev, { ...product, cartQuantity: 1 }];
     });
   };
 
-  // تحديث كمية منتج معين
+  // ✅ دالة updateQuantity مع التحقق من المخزون
   const updateQuantity = (productId: string, delta: number) => {
     setCart(prev =>
       prev
         .map(p => {
           if (p.id !== productId) return p;
           const newQty = p.cartQuantity + delta;
-          if (newQty <= 0) return null;
+          if (newQty < 1) return null;
+          if (newQty > p.quantity) {
+            alert(`⚠️ لا يمكن تعديل الكمية إلى ${newQty}. المتاح فقط ${p.quantity}.`);
+            return p;
+          }
           return { ...p, cartQuantity: newQty };
         })
         .filter(Boolean) as CartItem[]
     );
   };
 
-  // إزالة منتج بالكامل
   const removeItem = (productId: string) => {
     setCart(prev => prev.filter(p => p.id !== productId));
   };
 
-  // حساب الإجمالي
   const totalPrice = cart.reduce((sum, item) => sum + item.price * item.cartQuantity, 0);
 
-  // إرسال الطلب
   const handleSubmitOrder = async () => {
     if (!customerName || !customerPhone) {
       alert('يرجى إدخال الاسم ورقم الجوال');
@@ -135,13 +145,11 @@ export default function Storefront() {
       const data = await res.json();
       if (data.success) {
         setOrderStatus('success');
-        // إنشاء رسالة واتساب
         const message = `مرحباً، أود طلب:\n${cart
           .map(i => `${i.name} × ${i.cartQuantity} = ${i.price * i.cartQuantity} ريال`)
           .join('\n')}\nالإجمالي: ${totalPrice} ريال\nالاسم: ${customerName}\nالجوال: ${customerPhone}\nالعنوان: ${customerAddress || 'غير محدد'}\nملاحظات: ${notes || 'لا توجد'}\nطريقة الدفع: ${paymentMethod === 'cash' ? 'كاش' : paymentMethod === 'card' ? 'بطاقة' : paymentMethod === 'transfer' ? 'تحويل' : 'واتساب'}`;
-        const phone = store.owner_phone || ''; // يمكن إضافة رقم هاتف المتجر في المستقبل
+        const phone = store.owner_phone || '';
         setWhatsappLink(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
-        // إفراغ السلة
         setCart([]);
         localStorage.removeItem(`cart_${slug}`);
       } else {
@@ -159,7 +167,6 @@ export default function Storefront() {
 
   return (
     <div className="storefront" dir="rtl">
-      {/* الهيدر */}
       <header className="storefront-header">
         <div className="store-logo">
           {store.logo_url ? <img src={store.logo_url} alt={store.name} /> : <span>🏪</span>}
@@ -172,7 +179,6 @@ export default function Storefront() {
 
       {store.description && <p className="store-description">{store.description}</p>}
 
-      {/* قائمة المنتجات */}
       {store.products.length === 0 ? (
         <p className="no-products">لا توجد منتجات متاحة حالياً</p>
       ) : (
@@ -182,6 +188,7 @@ export default function Storefront() {
               {product.image_url && <img src={product.image_url} alt={product.name} />}
               <h3>{product.name}</h3>
               <p className="price">{product.price} ريال</p>
+              <p className="stock-info">المتبقي: {product.quantity}</p>
               <button onClick={() => addToCart(product)} disabled={product.quantity === 0}>
                 {product.quantity > 0 ? 'أضف للسلة' : 'غير متوفر'}
               </button>
@@ -190,7 +197,6 @@ export default function Storefront() {
         </div>
       )}
 
-      {/* السلة الجانبية */}
       {showCart && (
         <div className="cart-sidebar">
           <div className="cart-header">
@@ -208,6 +214,7 @@ export default function Storefront() {
                       <span className="cart-item-name">{item.name}</span>
                       <span className="cart-item-price">{item.price} ريال</span>
                     </div>
+                    <div className="cart-item-stock">المتبقي في المخزون: {item.quantity}</div>
                     <div className="cart-item-controls">
                       <button onClick={() => updateQuantity(item.id, -1)}>-</button>
                       <span>{item.cartQuantity}</span>
@@ -219,53 +226,20 @@ export default function Storefront() {
               </div>
               <div className="cart-total">الإجمالي: {totalPrice} ريال</div>
 
-              {/* نموذج العميل */}
               <div className="customer-form">
-                <input
-                  type="text"
-                  placeholder="الاسم الكامل *"
-                  value={customerName}
-                  onChange={e => setCustomerName(e.target.value)}
-                />
-                <input
-                  type="tel"
-                  placeholder="رقم الجوال *"
-                  value={customerPhone}
-                  onChange={e => setCustomerPhone(e.target.value)}
-                />
-                <input
-                  type="text"
-                  placeholder="العنوان (اختياري)"
-                  value={customerAddress}
-                  onChange={e => setCustomerAddress(e.target.value)}
-                />
-                <textarea
-                  placeholder="ملاحظات إضافية (اختياري)"
-                  value={notes}
-                  onChange={e => setNotes(e.target.value)}
-                />
+                <input type="text" placeholder="الاسم الكامل *" value={customerName} onChange={e => setCustomerName(e.target.value)} />
+                <input type="tel" placeholder="رقم الجوال *" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
+                <input type="text" placeholder="العنوان (اختياري)" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} />
+                <textarea placeholder="ملاحظات إضافية (اختياري)" value={notes} onChange={e => setNotes(e.target.value)} />
               </div>
 
-              {/* طرق الدفع */}
               <div className="payment-methods">
                 <p>طريقة الدفع:</p>
                 <div className="payment-options">
-                  <label>
-                    <input type="radio" name="payment" value="cash" checked={paymentMethod === 'cash'} onChange={() => setPaymentMethod('cash')} />
-                    💵 كاش
-                  </label>
-                  <label>
-                    <input type="radio" name="payment" value="card" checked={paymentMethod === 'card'} onChange={() => setPaymentMethod('card')} />
-                    💳 بطاقة
-                  </label>
-                  <label>
-                    <input type="radio" name="payment" value="transfer" checked={paymentMethod === 'transfer'} onChange={() => setPaymentMethod('transfer')} />
-                    📱 تحويل بنكي
-                  </label>
-                  <label>
-                    <input type="radio" name="payment" value="whatsapp" checked={paymentMethod === 'whatsapp'} onChange={() => setPaymentMethod('whatsapp')} />
-                    📱 واتساب (دردشة)
-                  </label>
+                  <label><input type="radio" name="payment" value="cash" checked={paymentMethod === 'cash'} onChange={() => setPaymentMethod('cash')} /> 💵 كاش</label>
+                  <label><input type="radio" name="payment" value="card" checked={paymentMethod === 'card'} onChange={() => setPaymentMethod('card')} /> 💳 بطاقة</label>
+                  <label><input type="radio" name="payment" value="transfer" checked={paymentMethod === 'transfer'} onChange={() => setPaymentMethod('transfer')} /> 📱 تحويل بنكي</label>
+                  <label><input type="radio" name="payment" value="whatsapp" checked={paymentMethod === 'whatsapp'} onChange={() => setPaymentMethod('whatsapp')} /> 📱 واتساب (دردشة)</label>
                 </div>
               </div>
 
