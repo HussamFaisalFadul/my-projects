@@ -88,6 +88,7 @@ export interface Product {
   name: string;
   price: number;
   quantity: number;
+  reservedQuantity?: number;   // ← تمت الإضافة (الكمية المحجوزة)
   category: string;
   minQuantity: number;
   imageUrl?: string;
