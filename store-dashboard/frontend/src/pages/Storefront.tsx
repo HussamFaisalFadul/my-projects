@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import './Storefront.css'; // سننشئ ملف CSS للتنسيق
 
 const BACKEND = 'https://store-dashboard-backend.onrender.com';
 
@@ -12,54 +13,277 @@ interface Product {
   category?: string;
 }
 
+interface CartItem extends Product {
+  cartQuantity: number;
+}
+
+type PaymentMethod = 'cash' | 'card' | 'transfer' | 'whatsapp';
+
 export default function Storefront() {
-  // استخراج slug من الرابط مباشرة (لأننا لا نستخدم React Router)
   const slug = window.location.pathname.split('/store/')[1];
   const [store, setStore] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [showCart, setShowCart] = useState(false);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [notes, setNotes] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [orderStatus, setOrderStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [whatsappLink, setWhatsappLink] = useState('');
 
+  // تحميل بيانات المتجر
   useEffect(() => {
     if (!slug) {
       setError('رابط غير صحيح');
       setLoading(false);
       return;
     }
-    const apiUrl = `${BACKEND}/api/public/stores/${slug}`;
-    console.log('Fetching:', apiUrl);
-    fetch(apiUrl)
+    fetch(`${BACKEND}/api/public/stores/${slug}`)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       })
       .then(data => {
-        console.log('Store data:', data);
+        if (data.error) throw new Error(data.error);
         setStore(data);
       })
       .catch(err => {
-        console.error('Fetch error:', err);
+        console.error(err);
         setError(err.message);
       })
       .finally(() => setLoading(false));
   }, [slug]);
 
-  if (loading) return <div style={{ padding: 20, textAlign: 'center' }}>جاري تحميل المتجر...</div>;
-  if (error) return <div style={{ padding: 20, textAlign: 'center', color: 'red' }}>حدث خطأ: {error}</div>;
-  if (!store) return <div style={{ padding: 20, textAlign: 'center' }}>المتجر غير موجود</div>;
+  // تحميل السلة من localStorage
+  useEffect(() => {
+    const savedCart = localStorage.getItem(`cart_${slug}`);
+    if (savedCart) setCart(JSON.parse(savedCart));
+  }, [slug]);
+
+  // حفظ السلة في localStorage كلما تغيرت
+  useEffect(() => {
+    localStorage.setItem(`cart_${slug}`, JSON.stringify(cart));
+  }, [cart, slug]);
+
+  // إضافة منتج إلى السلة
+  const addToCart = (product: Product) => {
+    setCart(prev => {
+      const existing = prev.find(p => p.id === product.id);
+      if (existing) {
+        return prev.map(p =>
+          p.id === product.id ? { ...p, cartQuantity: p.cartQuantity + 1 } : p
+        );
+      }
+      return [...prev, { ...product, cartQuantity: 1 }];
+    });
+  };
+
+  // تحديث كمية منتج معين
+  const updateQuantity = (productId: string, delta: number) => {
+    setCart(prev =>
+      prev
+        .map(p => {
+          if (p.id !== productId) return p;
+          const newQty = p.cartQuantity + delta;
+          if (newQty <= 0) return null;
+          return { ...p, cartQuantity: newQty };
+        })
+        .filter(Boolean) as CartItem[]
+    );
+  };
+
+  // إزالة منتج بالكامل
+  const removeItem = (productId: string) => {
+    setCart(prev => prev.filter(p => p.id !== productId));
+  };
+
+  // حساب الإجمالي
+  const totalPrice = cart.reduce((sum, item) => sum + item.price * item.cartQuantity, 0);
+
+  // إرسال الطلب
+  const handleSubmitOrder = async () => {
+    if (!customerName || !customerPhone) {
+      alert('يرجى إدخال الاسم ورقم الجوال');
+      return;
+    }
+    if (cart.length === 0) {
+      alert('السلة فارغة');
+      return;
+    }
+    setOrderStatus('submitting');
+    try {
+      const res = await fetch(`${BACKEND}/api/public/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          storeId: store.id,
+          customerName,
+          customerPhone,
+          items: cart.map(item => ({
+            productId: item.id,
+            productName: item.name,
+            quantity: item.cartQuantity,
+            price: item.price,
+          })),
+          totalPrice,
+          notes: `${notes}\nالعنوان: ${customerAddress}\nطريقة الدفع: ${paymentMethod}`,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOrderStatus('success');
+        // إنشاء رسالة واتساب
+        const message = `مرحباً، أود طلب:\n${cart
+          .map(i => `${i.name} × ${i.cartQuantity} = ${i.price * i.cartQuantity} ريال`)
+          .join('\n')}\nالإجمالي: ${totalPrice} ريال\nالاسم: ${customerName}\nالجوال: ${customerPhone}\nالعنوان: ${customerAddress || 'غير محدد'}\nملاحظات: ${notes || 'لا توجد'}\nطريقة الدفع: ${paymentMethod === 'cash' ? 'كاش' : paymentMethod === 'card' ? 'بطاقة' : paymentMethod === 'transfer' ? 'تحويل' : 'واتساب'}`;
+        const phone = store.owner_phone || ''; // يمكن إضافة رقم هاتف المتجر في المستقبل
+        setWhatsappLink(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
+        // إفراغ السلة
+        setCart([]);
+        localStorage.removeItem(`cart_${slug}`);
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err) {
+      console.error(err);
+      setOrderStatus('error');
+    }
+  };
+
+  if (loading) return <div className="storefront-loading">جاري تحميل المتجر...</div>;
+  if (error) return <div className="storefront-error">حدث خطأ: {error}</div>;
+  if (!store) return <div className="storefront-error">المتجر غير موجود</div>;
 
   return (
-    <div style={{ padding: 20, fontFamily: 'Tajawal, sans-serif', direction: 'rtl' }}>
-      <h1>{store.name}</h1>
-      {store.products && store.products.length === 0 && <p>لا توجد منتجات متاحة حالياً</p>}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
-        {store.products && store.products.map((product: Product) => (
-          <div key={product.id} style={{ border: '1px solid #ddd', padding: 12, borderRadius: 8 }}>
-            <h3>{product.name}</h3>
-            <p>{product.price} ريال</p>
-            <p>المتبقي: {product.quantity}</p>
+    <div className="storefront" dir="rtl">
+      {/* الهيدر */}
+      <header className="storefront-header">
+        <div className="store-logo">
+          {store.logo_url ? <img src={store.logo_url} alt={store.name} /> : <span>🏪</span>}
+          <h1>{store.name}</h1>
+        </div>
+        <button className="cart-icon" onClick={() => setShowCart(!showCart)}>
+          🛒 {cart.reduce((s, i) => s + i.cartQuantity, 0)}
+        </button>
+      </header>
+
+      {store.description && <p className="store-description">{store.description}</p>}
+
+      {/* قائمة المنتجات */}
+      {store.products.length === 0 ? (
+        <p className="no-products">لا توجد منتجات متاحة حالياً</p>
+      ) : (
+        <div className="products-grid">
+          {store.products.map((product: Product) => (
+            <div key={product.id} className="product-card">
+              {product.image_url && <img src={product.image_url} alt={product.name} />}
+              <h3>{product.name}</h3>
+              <p className="price">{product.price} ريال</p>
+              <button onClick={() => addToCart(product)} disabled={product.quantity === 0}>
+                {product.quantity > 0 ? 'أضف للسلة' : 'غير متوفر'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* السلة الجانبية */}
+      {showCart && (
+        <div className="cart-sidebar">
+          <div className="cart-header">
+            <h2>سلة التسوق</h2>
+            <button onClick={() => setShowCart(false)}>✕</button>
           </div>
-        ))}
-      </div>
+          {cart.length === 0 ? (
+            <p className="empty-cart">السلة فارغة</p>
+          ) : (
+            <>
+              <div className="cart-items">
+                {cart.map(item => (
+                  <div key={item.id} className="cart-item">
+                    <div className="cart-item-info">
+                      <span className="cart-item-name">{item.name}</span>
+                      <span className="cart-item-price">{item.price} ريال</span>
+                    </div>
+                    <div className="cart-item-controls">
+                      <button onClick={() => updateQuantity(item.id, -1)}>-</button>
+                      <span>{item.cartQuantity}</span>
+                      <button onClick={() => updateQuantity(item.id, 1)}>+</button>
+                      <button className="remove-btn" onClick={() => removeItem(item.id)}>🗑️</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="cart-total">الإجمالي: {totalPrice} ريال</div>
+
+              {/* نموذج العميل */}
+              <div className="customer-form">
+                <input
+                  type="text"
+                  placeholder="الاسم الكامل *"
+                  value={customerName}
+                  onChange={e => setCustomerName(e.target.value)}
+                />
+                <input
+                  type="tel"
+                  placeholder="رقم الجوال *"
+                  value={customerPhone}
+                  onChange={e => setCustomerPhone(e.target.value)}
+                />
+                <input
+                  type="text"
+                  placeholder="العنوان (اختياري)"
+                  value={customerAddress}
+                  onChange={e => setCustomerAddress(e.target.value)}
+                />
+                <textarea
+                  placeholder="ملاحظات إضافية (اختياري)"
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                />
+              </div>
+
+              {/* طرق الدفع */}
+              <div className="payment-methods">
+                <p>طريقة الدفع:</p>
+                <div className="payment-options">
+                  <label>
+                    <input type="radio" name="payment" value="cash" checked={paymentMethod === 'cash'} onChange={() => setPaymentMethod('cash')} />
+                    💵 كاش
+                  </label>
+                  <label>
+                    <input type="radio" name="payment" value="card" checked={paymentMethod === 'card'} onChange={() => setPaymentMethod('card')} />
+                    💳 بطاقة
+                  </label>
+                  <label>
+                    <input type="radio" name="payment" value="transfer" checked={paymentMethod === 'transfer'} onChange={() => setPaymentMethod('transfer')} />
+                    📱 تحويل بنكي
+                  </label>
+                  <label>
+                    <input type="radio" name="payment" value="whatsapp" checked={paymentMethod === 'whatsapp'} onChange={() => setPaymentMethod('whatsapp')} />
+                    📱 واتساب (دردشة)
+                  </label>
+                </div>
+              </div>
+
+              <button className="checkout-btn" onClick={handleSubmitOrder} disabled={orderStatus === 'submitting'}>
+                {orderStatus === 'submitting' ? 'جاري الإرسال...' : 'تأكيد الطلب'}
+              </button>
+
+              {orderStatus === 'success' && whatsappLink && (
+                <div className="whatsapp-link">
+                  <p>✅ تم استلام طلبك! يرجى تأكيد الطلب عبر واتساب:</p>
+                  <a href={whatsappLink} target="_blank" rel="noopener noreferrer">📱 افتح واتساب</a>
+                </div>
+              )}
+              {orderStatus === 'error' && <p className="error-msg">❌ حدث خطأ، حاول مرة أخرى.</p>}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
