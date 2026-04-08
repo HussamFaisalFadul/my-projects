@@ -136,7 +136,8 @@ export interface Notification {
   read: boolean;
 }
 
-const BACKEND_URL = 'https://store-dashboard-backend.onrender.com';
+// استخدام متغير البيئة مع fallback للإنتاج
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://store-dashboard-backend.onrender.com';
 
 function authHeaders(): HeadersInit {
   const token = localStorage.getItem('store_token');
