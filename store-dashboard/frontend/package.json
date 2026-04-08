@@ -17,9 +17,7 @@
     "i18next": "^23.0.0",
     "i18next-browser-languagedetector": "^7.0.0",
     "react-router-dom": "^6.22.0",
-    "lucide-react": "^0.344.0",
-    "clsx": "^2.1.0",
-    "tailwind-merge": "^2.2.1"
+    "lucide-react": "^0.344.0"
   },
   "devDependencies": {
     "vite": "^5.0.0",
@@ -27,8 +25,6 @@
     "typescript": "^5.2.2",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
-    "autoprefixer": "^10.4.17",
-    "postcss": "^8.4.35",
-    "tailwindcss": "^3.4.1"
+    "@types/react-router-dom": "^5.3.3"
   }
 }
