@@ -130,8 +130,8 @@ export default function App() {
         localStorage.setItem('store_name', store.name);
         setCurrentStoreId(store.id);
         setStoreName(store.name);
-      } else if (store.error) {
-        setStoreError(store.error || t('common.errorOccurred'));
+      } else if ((store as any).error) {
+        setStoreError((store as any).error || t('common.errorOccurred'));
       }
     } catch {
       setStoreError(t('common.connectionError'));
@@ -221,13 +221,43 @@ export default function App() {
             ))}
           </nav>
         </div>
-        <div className="header-left" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-          <span className={`status-dot ${isConnected ? 'online' : 'offline'}`}></span>
-          <button className="notif-btn" onClick={() => { setShowNotifications(!showNotifications); if (!showNotifications) markAllRead(); }}>
-            🔔{unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+
+        <div className="header-left" style={{ display: 'flex', gap: '15px', alignItems: 'center', position: 'relative' }}>
+          <div className="connected-users">
+            <span className={`status-dot ${isConnected ? 'online' : 'offline'}`}></span>
+            <span>{isConnected ? t('common.connected') : t('common.disconnected')}</span>
+          </div>
+
+          <div className="notif-wrapper" style={{ position: 'relative' }}>
+            <button className="notif-btn" onClick={() => { setShowNotifications(!showNotifications); if (!showNotifications) markAllRead(); }}>
+              🔔{unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+            </button>
+            {showNotifications && (
+              <div className="notif-panel">
+                <div className="notif-header">{t('notifications.title')}</div>
+                {notifications.length === 0 ? (
+                  <div className="notif-empty">{t('notifications.noNotifications')}</div>
+                ) : (
+                  notifications.slice(0, 10).map(n => {
+                    const timeValue = (n as any).createdAt ?? (n as any).created_at;
+                    return (
+                      <div key={n.id} className={`notif-item ${n.type === 'تحذير_مخزون' ? 'warning' : n.type === 'طلب_جديد' ? 'info' : 'success'}`}>
+                        <div className="notif-msg">{n.message}</div>
+                        <div className="notif-time">{timeValue ? new Date(timeValue).toLocaleTimeString('ar-SA') : '--:--'}</div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+
+          <button onClick={toggleLanguage} className="lang-btn" style={{ background: 'rgba(0,0,0,0.05)', padding: '6px 12px', borderRadius: 20 }}>
+            🌐 {i18n.language === 'ar' ? 'EN' : 'عربي'}
           </button>
-          <button onClick={toggleLanguage} className="lang-btn">🌐 {i18n.language === 'ar' ? 'EN' : 'عربي'}</button>
-          <button onClick={handleLogout} className="logout-btn">{t('common.logout')}</button>
+          <button onClick={handleLogout} className="logout-btn" style={{ background: 'none', border: '1px solid #ddd', padding: '6px 12px', borderRadius: 8 }}>
+            {t('common.logout')}
+          </button>
         </div>
       </header>
 
