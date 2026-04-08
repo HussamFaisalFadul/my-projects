@@ -2,14 +2,15 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 
 const BACKEND = 'https://store-dashboard-backend.onrender.com';
 
+// أيقونات SVG (نفس الكود الثاني)
 const Icons = {
   Cart: () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>,
   Plus: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
   Minus: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>,
   X: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
   Search: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
-  Star: ({ filled }) => <svg width="14" height="14" viewBox="0 0 24 24" fill={filled ? '#f59e0b' : 'none'} stroke="#f59e0b" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
-  Heart: ({ active }) => <svg width="18" height="18" viewBox="0 0 24 24" fill={active ? '#ef4444' : 'none'} stroke={active ? '#ef4444' : 'currentColor'} strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+  Star: ({ filled }: { filled: boolean }) => <svg width="14" height="14" viewBox="0 0 24 24" fill={filled ? '#f59e0b' : 'none'} stroke="#f59e0b" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+  Heart: ({ active }: { active: boolean }) => <svg width="18" height="18" viewBox="0 0 24 24" fill={active ? '#ef4444' : 'none'} stroke={active ? '#ef4444' : 'currentColor'} strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
   Grid: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>,
   List: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,
   Filter: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>,
@@ -43,26 +44,7 @@ interface CartItem extends Product {
   isReservation: boolean;
 }
 
-const MOCK_PRODUCTS: Product[] = [
-  { id: '1', name: 'سماعات لاسلكية Pro', price: 299, original_price: 399, quantity: 15, reserved_quantity: 2, image_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&q=80', category: 'إلكترونيات', rating: 4.8, review_count: 234, badge: 'bestseller' },
-  { id: '2', name: 'ساعة ذكية Ultra', price: 899, quantity: 8, reserved_quantity: 1, image_url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&q=80', category: 'إلكترونيات', rating: 4.6, review_count: 89, badge: 'new' },
-  { id: '3', name: 'حقيبة جلد فاخرة', price: 450, original_price: 650, quantity: 5, image_url: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80', category: 'أزياء', rating: 4.9, review_count: 156, badge: 'sale' },
-  { id: '4', name: 'عطر نخبة', price: 320, quantity: 20, image_url: 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=400&q=80', category: 'عناية', rating: 4.7, review_count: 312, badge: 'hot' },
-  { id: '5', name: 'كاميرا احترافية', price: 3200, quantity: 3, reserved_quantity: 1, image_url: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=400&q=80', category: 'إلكترونيات', rating: 4.5, review_count: 67 },
-  { id: '6', name: 'حذاء رياضي', price: 185, original_price: 240, quantity: 30, image_url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&q=80', category: 'أزياء', rating: 4.4, review_count: 445, badge: 'sale' },
-  { id: '7', name: 'مرطب بشرة فاخر', price: 220, quantity: 0, reserved_quantity: 0, image_url: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400&q=80', category: 'عناية', rating: 4.3, review_count: 198 },
-  { id: '8', name: 'لابتوب Ultra Slim', price: 4500, quantity: 7, image_url: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=400&q=80', category: 'إلكترونيات', rating: 4.8, review_count: 123, badge: 'new' },
-];
-
-const CATEGORIES = ['الكل', 'إلكترونيات', 'أزياء', 'عناية'];
-
-const BADGE_CONFIG = {
-  new: { label: 'جديد', bg: '#3b82f6', color: '#fff' },
-  sale: { label: 'تخفيض', bg: '#ef4444', color: '#fff' },
-  hot: { label: 'رائج', bg: '#f97316', color: '#fff' },
-  bestseller: { label: 'الأكثر مبيعاً', bg: '#8b5cf6', color: '#fff' },
-};
-
+// مكون تقييم النجوم
 function StarRating({ rating, count }: { rating: number; count?: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -72,6 +54,7 @@ function StarRating({ rating, count }: { rating: number; count?: number }) {
   );
 }
 
+// الأنماط (مبسطة من الكود الثاني، مع تعديلات بسيطة)
 const styles: Record<string, React.CSSProperties> = {
   app: { fontFamily: "'Tajawal', 'Segoe UI', sans-serif", background: '#f8f8f6', minHeight: '100vh', direction: 'rtl' },
   header: { position: 'sticky', top: 0, zIndex: 100, background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #e8e8e4', padding: '0 24px' },
@@ -79,70 +62,59 @@ const styles: Record<string, React.CSSProperties> = {
   logo: { display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', flexShrink: 0 },
   logoImg: { width: 40, height: 40, borderRadius: 10, objectFit: 'cover', border: '1px solid #e8e8e4' },
   logoText: { fontSize: 20, fontWeight: 700, color: '#1a1a1a', letterSpacing: '-0.3px' },
-  searchWrap: { flex: 1, position: 'relative' as const, maxWidth: 480 },
-  searchInput: { width: '100%', height: 42, paddingRight: 44, paddingLeft: 16, border: '1.5px solid #e8e8e4', borderRadius: 24, fontSize: 14, background: '#f8f8f6', outline: 'none', boxSizing: 'border-box' as const, transition: 'border-color 0.2s' },
-  searchIcon: { position: 'absolute' as const, right: 14, top: '50%', transform: 'translateY(-50%)', color: '#999', pointerEvents: 'none' as const },
+  searchWrap: { flex: 1, position: 'relative', maxWidth: 480 },
+  searchInput: { width: '100%', height: 42, paddingRight: 44, paddingLeft: 16, border: '1.5px solid #e8e8e4', borderRadius: 24, fontSize: 14, background: '#f8f8f6', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s' },
+  searchIcon: { position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: '#999', pointerEvents: 'none' },
   cartBtn: { display: 'flex', alignItems: 'center', gap: 8, background: '#1a1a1a', color: '#fff', border: 'none', borderRadius: 24, padding: '10px 20px', cursor: 'pointer', fontSize: 14, fontWeight: 600, flexShrink: 0 },
   badge: { background: '#ef4444', color: '#fff', borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 },
-
-  hero: { background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', padding: '60px 24px', textAlign: 'center' as const, color: '#fff' },
+  hero: { background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)', padding: '60px 24px', textAlign: 'center', color: '#fff' },
   heroTitle: { fontSize: 42, fontWeight: 800, marginBottom: 12, letterSpacing: '-1px' },
   heroSub: { fontSize: 18, opacity: 0.75, marginBottom: 32 },
   heroStats: { display: 'flex', justifyContent: 'center', gap: 48 },
-  heroStat: { textAlign: 'center' as const },
   heroStatNum: { fontSize: 28, fontWeight: 700 },
   heroStatLabel: { fontSize: 13, opacity: 0.6 },
-
   trustBar: { background: '#fff', borderBottom: '1px solid #e8e8e4', padding: '12px 24px' },
-  trustInner: { maxWidth: 1400, margin: '0 auto', display: 'flex', justifyContent: 'center', gap: 40, flexWrap: 'wrap' as const },
+  trustInner: { maxWidth: 1400, margin: '0 auto', display: 'flex', justifyContent: 'center', gap: 40, flexWrap: 'wrap' },
   trustItem: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#555' },
-
   main: { maxWidth: 1400, margin: '0 auto', padding: '32px 24px', display: 'flex', gap: 28, alignItems: 'flex-start' },
-
-  sidebar: { width: 240, flexShrink: 0, position: 'sticky' as const, top: 90 },
+  sidebar: { width: 240, flexShrink: 0, position: 'sticky', top: 90 },
   sidebarCard: { background: '#fff', borderRadius: 16, border: '1px solid #e8e8e4', padding: 20, marginBottom: 16 },
-  sidebarTitle: { fontSize: 14, fontWeight: 700, color: '#1a1a1a', marginBottom: 14, textTransform: 'uppercase' as const, letterSpacing: 0.5 },
-  catBtn: { display: 'block', width: '100%', padding: '9px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, textAlign: 'right' as const, marginBottom: 4, transition: 'all 0.15s' },
-
+  sidebarTitle: { fontSize: 14, fontWeight: 700, color: '#1a1a1a', marginBottom: 14, textTransform: 'uppercase', letterSpacing: 0.5 },
+  catBtn: { display: 'block', width: '100%', padding: '9px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, textAlign: 'right', marginBottom: 4, transition: 'all 0.15s' },
   content: { flex: 1, minWidth: 0 },
-  toolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap' as const, gap: 12 },
+  toolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 },
   toolbarLeft: { display: 'flex', alignItems: 'center', gap: 12 },
   sortSelect: { height: 36, padding: '0 12px', border: '1px solid #e8e8e4', borderRadius: 8, fontSize: 14, background: '#fff', cursor: 'pointer' },
   viewBtns: { display: 'flex', gap: 4 },
   viewBtn: { width: 36, height: 36, border: '1px solid #e8e8e4', borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' },
   resultCount: { fontSize: 14, color: '#666' },
-
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 20 },
-
-  card: { background: '#fff', borderRadius: 18, border: '1px solid #e8e8e4', overflow: 'hidden', cursor: 'pointer', transition: 'all 0.25s ease', position: 'relative' as const },
-  imgWrap: { position: 'relative' as const, paddingTop: '85%', background: '#f4f3f0', overflow: 'hidden' },
-  img: { position: 'absolute' as const, inset: 0, width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.4s ease' },
-  cardBadge: { position: 'absolute' as const, top: 10, right: 10, padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: 1 },
-  wishBtn: { position: 'absolute' as const, bottom: 10, left: 10, width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.92)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' },
-  outOfStockOverlay: { position: 'absolute' as const, inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  card: { background: '#fff', borderRadius: 18, border: '1px solid #e8e8e4', overflow: 'hidden', cursor: 'pointer', transition: 'all 0.25s ease', position: 'relative' },
+  imgWrap: { position: 'relative', paddingTop: '85%', background: '#f4f3f0', overflow: 'hidden' },
+  img: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.4s ease' },
+  cardBadge: { position: 'absolute', top: 10, right: 10, padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, zIndex: 1 },
+  wishBtn: { position: 'absolute', bottom: 10, left: 10, width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.92)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' },
+  outOfStockOverlay: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   outOfStockLabel: { background: '#fff', color: '#1a1a1a', padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 700 },
   cardBody: { padding: '14px 16px 16px' },
-  cardCat: { fontSize: 11, color: '#888', textTransform: 'uppercase' as const, letterSpacing: 0.5, marginBottom: 6 },
+  cardCat: { fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
   cardName: { fontSize: 15, fontWeight: 600, color: '#1a1a1a', marginBottom: 6, lineHeight: 1.4 },
-  priceRow: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 },
+  priceRow: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' },
   price: { fontSize: 17, fontWeight: 700, color: '#1a1a1a' },
   oldPrice: { fontSize: 13, color: '#bbb', textDecoration: 'line-through' },
   discount: { fontSize: 12, color: '#ef4444', fontWeight: 600 },
   addBtn: { width: '100%', height: 40, borderRadius: 12, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, transition: 'all 0.2s' },
-
-  listView: { display: 'flex', flexDirection: 'column' as const, gap: 12 },
-  listCard: { background: '#fff', borderRadius: 16, border: '1px solid #e8e8e4', display: 'flex', overflow: 'hidden', position: 'relative' as const },
+  listView: { display: 'flex', flexDirection: 'column', gap: 12 },
+  listCard: { background: '#fff', borderRadius: 16, border: '1px solid #e8e8e4', display: 'flex', overflow: 'hidden', position: 'relative' },
   listImg: { width: 140, height: 120, objectFit: 'cover', flexShrink: 0 },
   listBody: { padding: '14px 18px', flex: 1, display: 'flex', gap: 16, alignItems: 'center' },
   listInfo: { flex: 1 },
   listActions: { display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 },
-
-  drawerBackdrop: { position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', justifyContent: 'flex-end' },
-  drawer: { width: '100%', maxWidth: 440, background: '#fff', height: '100vh', display: 'flex', flexDirection: 'column' as const, boxShadow: '-4px 0 24px rgba(0,0,0,0.15)' },
+  drawerBackdrop: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', justifyContent: 'flex-end' },
+  drawer: { width: '100%', maxWidth: 440, background: '#fff', height: '100vh', display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 24px rgba(0,0,0,0.15)' },
   drawerHeader: { padding: '20px 24px', borderBottom: '1px solid #e8e8e4', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  drawerBody: { flex: 1, overflowY: 'auto' as const, padding: '20px 24px' },
+  drawerBody: { flex: 1, overflowY: 'auto', padding: '20px 24px' },
   drawerFooter: { padding: '20px 24px', borderTop: '1px solid #e8e8e4', background: '#fafafa' },
-
   cartRow: { display: 'flex', gap: 14, padding: '14px 0', borderBottom: '1px solid #f0f0ec' },
   cartImg: { width: 72, height: 72, borderRadius: 12, objectFit: 'cover', border: '1px solid #e8e8e4', flexShrink: 0 },
   cartInfo: { flex: 1 },
@@ -150,27 +122,28 @@ const styles: Record<string, React.CSSProperties> = {
   cartPrice: { fontSize: 14, fontWeight: 700, color: '#1a1a1a' },
   qtyRow: { display: 'flex', alignItems: 'center', gap: 0, marginTop: 8 },
   qtyBtn: { width: 28, height: 28, border: '1px solid #e8e8e4', background: '#f8f8f6', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  qtyNum: { width: 36, textAlign: 'center' as const, fontSize: 14, fontWeight: 600 },
-
-  form: { display: 'flex', flexDirection: 'column' as const, gap: 12 },
-  input: { height: 44, padding: '0 14px', border: '1.5px solid #e8e8e4', borderRadius: 10, fontSize: 14, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as const },
-  textarea: { padding: '12px 14px', border: '1.5px solid #e8e8e4', borderRadius: 10, fontSize: 14, outline: 'none', fontFamily: 'inherit', resize: 'vertical' as const },
+  qtyNum: { width: 36, textAlign: 'center', fontSize: 14, fontWeight: 600 },
+  form: { display: 'flex', flexDirection: 'column', gap: 12 },
+  input: { height: 44, padding: '0 14px', border: '1.5px solid #e8e8e4', borderRadius: 10, fontSize: 14, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' },
+  textarea: { padding: '12px 14px', border: '1.5px solid #e8e8e4', borderRadius: 10, fontSize: 14, outline: 'none', fontFamily: 'inherit', resize: 'vertical' },
   payRow: { display: 'flex', gap: 8 },
   payBtn: { flex: 1, height: 40, border: '1.5px solid #e8e8e4', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600, background: '#fff', transition: 'all 0.15s' },
-
   totalRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderTop: '1px solid #e8e8e4', borderBottom: '1px solid #e8e8e4', marginBottom: 16 },
   submitBtn: { width: '100%', height: 52, borderRadius: 14, border: 'none', background: '#25d366', color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, transition: 'all 0.2s' },
-
-  empty: { textAlign: 'center' as const, padding: '60px 20px', color: '#999' },
+  empty: { textAlign: 'center', padding: '60px 20px', color: '#999' },
   emptyIcon: { fontSize: 48, marginBottom: 12 },
-
-  successScreen: { textAlign: 'center' as const, padding: '60px 20px' },
-  successIcon: { width: 72, height: 72, borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 32 },
-
+  successScreen: { textAlign: 'center', padding: '60px 20px' },
   filterSection: { marginBottom: 8 },
   filterLabel: { fontSize: 13, color: '#888', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   rangeInput: { width: '100%', accentColor: '#1a1a1a' },
   checkRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', cursor: 'pointer' },
+};
+
+const BADGE_CONFIG = {
+  new: { label: 'جديد', bg: '#3b82f6', color: '#fff' },
+  sale: { label: 'تخفيض', bg: '#ef4444', color: '#fff' },
+  hot: { label: 'رائج', bg: '#f97316', color: '#fff' },
+  bestseller: { label: 'الأكثر مبيعاً', bg: '#8b5cf6', color: '#fff' },
 };
 
 export default function Storefront() {
@@ -193,28 +166,30 @@ export default function Storefront() {
   const [imgErrors, setImgErrors] = useState<Set<string>>(new Set());
   const searchRef = useRef<HTMLInputElement>(null);
 
+  // جلب بيانات المتجر من API الحقيقي
   useEffect(() => {
     if (!slug) {
-      setStore({ name: 'متجري الإلكتروني', logo_url: '', owner_phone: '966500000000', products: MOCK_PRODUCTS });
       setLoading(false);
       return;
     }
     fetch(`${BACKEND}/api/public/stores/${slug}`)
-      .then(r => r.json())
+      .then(res => res.json())
       .then(data => {
         if (data.products) {
           data.products = data.products.map((p: any) => ({
             ...p,
             availableQuantity: p.quantity - (p.reserved_quantity || 0),
-            rating: p.rating || (4 + Math.random()),
+            rating: p.rating || (4 + Math.random() * 0.8),
             review_count: p.review_count || Math.floor(Math.random() * 300 + 10),
+            original_price: p.original_price || (p.salePrice ? p.price : undefined),
+            badge: p.badge || (p.salePrice ? 'sale' : undefined),
           }));
         }
         setStore(data);
         setLoading(false);
       })
-      .catch(() => {
-        setStore({ name: 'متجري الإلكتروني', logo_url: '', owner_phone: '966500000000', products: MOCK_PRODUCTS });
+      .catch(err => {
+        console.error(err);
         setLoading(false);
       });
   }, [slug]);
@@ -228,11 +203,11 @@ export default function Storefront() {
   }, [store]);
 
   const allCategories = useMemo(() => {
-    const cats = new Set(products.map((p: Product) => p.category).filter(Boolean));
+    const cats = new Set(products.map(p => p.category).filter(Boolean));
     return ['الكل', ...Array.from(cats)];
   }, [products]);
 
-  const topPrice = useMemo(() => Math.max(...products.map((p: Product) => p.price), 1000), [products]);
+  const topPrice = useMemo(() => Math.max(...products.map(p => p.price), 1000), [products]);
 
   const filtered = useMemo(() => {
     let list = [...products];
@@ -297,20 +272,23 @@ export default function Storefront() {
           customerName: customer.name,
           customerPhone: customer.phone,
           customerAddress: customer.address,
-          items: cart.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.cartQuantity, isReservation: i.isReservation })),
+          items: cart.map(i => ({ productId: i.id, productName: i.name, quantity: i.cartQuantity, price: i.price, isReservation: i.isReservation })),
           totalPrice,
           paymentMethod,
           notes: customer.notes,
         }),
       });
-      if (response.ok || true) {
+      if (response.ok) {
         const itemsList = cart.map(i => `• ${i.name} × ${i.cartQuantity} = ${(i.price * i.cartQuantity).toLocaleString()} ر.س${i.isReservation ? ' (حجز)' : ''}`).join('\n');
         const msg = `🛍️ طلب جديد\n\nالعميل: ${customer.name}\nالجوال: ${customer.phone}\nالعنوان: ${customer.address || 'غير محدد'}\n\n${itemsList}\n\n💰 الإجمالي: ${totalPrice.toLocaleString()} ر.س\nالدفع: ${paymentMethod === 'cash' ? 'كاش' : paymentMethod === 'card' ? 'بطاقة' : 'تحويل'}${customer.notes ? '\n\nملاحظات: ' + customer.notes : ''}`;
-        window.open(`https://wa.me/${store.owner_phone}?text=${encodeURIComponent(msg)}`, '_blank');
+        window.open(`https://wa.me/${store.owner_phone || '966500000000'}?text=${encodeURIComponent(msg)}`, '_blank');
         setCart([]);
         setOrderStatus('success');
+      } else {
+        throw new Error();
       }
     } catch {
+      alert('حدث خطأ في إرسال الطلب، حاول مرة أخرى');
       setOrderStatus('idle');
     }
   };
@@ -333,6 +311,8 @@ export default function Storefront() {
     </div>
   );
 
+  if (!store) return <div style={{ textAlign: 'center', padding: 40 }}>المتجر غير موجود</div>;
+
   return (
     <div style={styles.app}>
       <style>{`
@@ -342,7 +322,6 @@ export default function Storefront() {
         ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #f0f0ec; } ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
         input:focus, textarea:focus { border-color: #1a1a1a !important; }
         .add-btn-primary:hover { background: #333 !important; transform: translateY(-1px); }
-        .add-btn-reservation:hover { background: #1d3461 !important; }
         .card-hover:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.1); }
         .cat-btn-active { background: #1a1a1a !important; color: #fff !important; }
         .cat-btn:hover { background: #f4f3f0 !important; }
@@ -350,7 +329,6 @@ export default function Storefront() {
         .wishbtn:hover { transform: scale(1.15); }
         .pay-btn-active { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
         .submit-btn:hover { background: #1ebc57 !important; transform: translateY(-1px); }
-        .drawer-enter { animation: slideIn 0.3s ease; }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @media (max-width: 768px) {
           .main-layout { flex-direction: column !important; }
@@ -369,20 +347,12 @@ export default function Storefront() {
               ? <img src={store.logo_url} alt="logo" style={styles.logoImg} onError={e => (e.currentTarget.style.display = 'none')} />
               : <div style={{ ...styles.logoImg, background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 18, fontWeight: 700 }}>م</div>
             }
-            <span style={styles.logoText}>{store?.name || 'المتجر'}</span>
+            <span style={styles.logoText}>{store.name}</span>
           </div>
-
           <div style={styles.searchWrap}>
             <span style={styles.searchIcon}><Icons.Search /></span>
-            <input
-              ref={searchRef}
-              style={styles.searchInput}
-              placeholder="ابحث عن منتج..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+            <input ref={searchRef} style={styles.searchInput} placeholder="ابحث عن منتج..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-
           <button style={styles.cartBtn} onClick={() => setShowCart(true)}>
             <Icons.Cart />
             <span>السلة</span>
@@ -393,15 +363,15 @@ export default function Storefront() {
 
       {/* Hero */}
       <div style={styles.hero}>
-        <h1 style={{ ...styles.heroTitle }} className="hero-title">{store?.name || 'أهلاً بك في متجرنا'}</h1>
-        <p style={styles.heroSub}>{store?.description || 'تسوق أفضل المنتجات بأسعار منافسة'}</p>
-        <div style={styles.heroStats} className="hero-stats">
+        <h1 className="hero-title" style={styles.heroTitle}>{store.name}</h1>
+        <p style={styles.heroSub}>{store.description || 'تسوق أفضل المنتجات بأسعار منافسة'}</p>
+        <div className="hero-stats" style={styles.heroStats}>
           {[
-            { num: filtered.length + '+', label: 'منتج' },
+            { num: products.length + '+', label: 'منتج' },
             { num: '24 ساعة', label: 'توصيل سريع' },
             { num: '100%', label: 'ضمان الجودة' },
           ].map(s => (
-            <div key={s.label} style={styles.heroStat}>
+            <div key={s.label} style={{ textAlign: 'center' }}>
               <div style={styles.heroStatNum}>{s.num}</div>
               <div style={styles.heroStatLabel}>{s.label}</div>
             </div>
@@ -411,7 +381,7 @@ export default function Storefront() {
 
       {/* Trust Bar */}
       <div style={styles.trustBar}>
-        <div style={styles.trustInner} className="trust-inner">
+        <div className="trust-inner" style={styles.trustInner}>
           {[
             { icon: <Icons.Truck />, text: 'شحن سريع لجميع المناطق' },
             { icon: <Icons.Shield />, text: 'دفع آمن ومشفر' },
@@ -426,14 +396,13 @@ export default function Storefront() {
         </div>
       </div>
 
-      {/* Main */}
-      <div style={{ ...styles.main, flexDirection: undefined }} className="main-layout">
-
+      {/* Main Content */}
+      <div className="main-layout" style={{ ...styles.main, flexDirection: undefined }}>
         {/* Sidebar */}
-        <aside style={styles.sidebar} className="sidebar">
+        <aside className="sidebar" style={styles.sidebar}>
           <div style={styles.sidebarCard}>
             <div style={styles.sidebarTitle}>الفئات</div>
-            {(allCategories.length > 1 ? allCategories : CATEGORIES).map(cat => (
+            {allCategories.map(cat => (
               <button
                 key={cat}
                 style={{ ...styles.catBtn, background: category === cat ? '#1a1a1a' : 'transparent', color: category === cat ? '#fff' : '#444' }}
@@ -444,22 +413,15 @@ export default function Storefront() {
               </button>
             ))}
           </div>
-
           <div style={styles.sidebarCard}>
             <div style={styles.sidebarTitle}>تصفية</div>
-
             <div style={styles.filterSection}>
               <div style={styles.filterLabel}>
                 <span>السعر الأقصى</span>
                 <span style={{ fontWeight: 700, color: '#1a1a1a' }}>{maxPrice.toLocaleString()} ر.س</span>
               </div>
-              <input
-                type="range" min={0} max={topPrice} step={50} value={maxPrice}
-                style={styles.rangeInput}
-                onChange={e => setMaxPrice(Number(e.target.value))}
-              />
+              <input type="range" min={0} max={topPrice} step={50} value={maxPrice} style={styles.rangeInput} onChange={e => setMaxPrice(Number(e.target.value))} />
             </div>
-
             <label style={styles.checkRow}>
               <input type="checkbox" checked={onlyInStock} onChange={e => setOnlyInStock(e.target.checked)} />
               <span style={{ fontSize: 14, color: '#444' }}>المتوفر فقط</span>
@@ -496,7 +458,7 @@ export default function Storefront() {
           {filtered.length === 0 ? (
             <div style={styles.empty}>
               <div style={styles.emptyIcon}>🔍</div>
-              <p style={{ fontSize: 16, color: '#888' }}>لا توجد منتجات تطابق بحثك</p>
+              <p>لا توجد منتجات تطابق بحثك</p>
             </div>
           ) : viewMode === 'grid' ? (
             <div style={styles.grid}>
@@ -514,18 +476,13 @@ export default function Storefront() {
                   >
                     <div style={styles.imgWrap}>
                       {!imgErrors.has(p.id) && p.image_url ? (
-                        <img
-                          src={p.image_url}
-                          alt={p.name}
-                          style={{ ...styles.img, transform: hoveredCard === p.id ? 'scale(1.06)' : 'scale(1)' }}
-                          onError={() => setImgErrors(prev => new Set(prev).add(p.id))}
-                        />
+                        <img src={p.image_url} alt={p.name} style={{ ...styles.img, transform: hoveredCard === p.id ? 'scale(1.06)' : 'scale(1)' }} onError={() => setImgErrors(prev => new Set(prev).add(p.id))} />
                       ) : (
                         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, color: '#bbb' }}>📦</div>
                       )}
-                      {p.badge && (
-                        <div style={{ ...styles.cardBadge, background: BADGE_CONFIG[p.badge].bg, color: BADGE_CONFIG[p.badge].color }}>
-                          {BADGE_CONFIG[p.badge].label}
+                      {p.badge && p.badge in BADGE_CONFIG && (
+                        <div style={{ ...styles.cardBadge, background: BADGE_CONFIG[p.badge as keyof typeof BADGE_CONFIG].bg, color: BADGE_CONFIG[p.badge as keyof typeof BADGE_CONFIG].color }}>
+                          {BADGE_CONFIG[p.badge as keyof typeof BADGE_CONFIG].label}
                         </div>
                       )}
                       <button style={styles.wishBtn} className="wishbtn" onClick={e => toggleWishlist(p.id, e)}>
@@ -541,20 +498,14 @@ export default function Storefront() {
                       {p.category && <div style={styles.cardCat}>{p.category}</div>}
                       <div style={styles.cardName}>{p.name}</div>
                       {p.rating && <StarRating rating={p.rating} count={p.review_count} />}
-                      <div style={{ ...styles.priceRow, marginTop: 8 }}>
+                      <div style={styles.priceRow}>
                         <span style={styles.price}>{p.price.toLocaleString()} ر.س</span>
                         {p.original_price && <span style={styles.oldPrice}>{p.original_price.toLocaleString()}</span>}
                         {disc > 0 && <span style={styles.discount}>-{disc}%</span>}
                       </div>
-                      {!isOut && available <= 5 && (
-                        <p style={{ fontSize: 12, color: '#f97316', marginBottom: 8 }}>⚡ متبقي {available} فقط</p>
-                      )}
+                      {!isOut && available <= 5 && <p style={{ fontSize: 12, color: '#f97316', marginBottom: 8 }}>⚡ متبقي {available} فقط</p>}
                       <button
-                        style={{
-                          ...styles.addBtn,
-                          background: isOut ? '#eee' : '#1a1a1a',
-                          color: isOut ? '#999' : '#fff',
-                        }}
+                        style={{ ...styles.addBtn, background: isOut ? '#eee' : '#1a1a1a', color: isOut ? '#999' : '#fff' }}
                         className={isOut ? '' : 'add-btn-primary'}
                         onClick={e => addToCart(p, e)}
                       >
@@ -579,9 +530,9 @@ export default function Storefront() {
                       ) : (
                         <div style={{ width: 140, height: 120, background: '#f4f3f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, color: '#bbb' }}>📦</div>
                       )}
-                      {p.badge && (
-                        <div style={{ position: 'absolute', top: 8, right: 8, padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700, background: BADGE_CONFIG[p.badge].bg, color: BADGE_CONFIG[p.badge].color }}>
-                          {BADGE_CONFIG[p.badge].label}
+                      {p.badge && p.badge in BADGE_CONFIG && (
+                        <div style={{ position: 'absolute', top: 8, right: 8, padding: '2px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700, background: BADGE_CONFIG[p.badge as keyof typeof BADGE_CONFIG].bg, color: BADGE_CONFIG[p.badge as keyof typeof BADGE_CONFIG].color }}>
+                          {BADGE_CONFIG[p.badge as keyof typeof BADGE_CONFIG].label}
                         </div>
                       )}
                     </div>
@@ -620,7 +571,7 @@ export default function Storefront() {
 
       {/* Footer */}
       <footer style={{ background: '#1a1a1a', color: '#aaa', textAlign: 'center', padding: '24px', fontSize: 13, marginTop: 40 }}>
-        <p>© {new Date().getFullYear()} {store?.name} · جميع الحقوق محفوظة</p>
+        <p>© {new Date().getFullYear()} {store.name} · جميع الحقوق محفوظة</p>
       </footer>
 
       {/* Cart Drawer */}
@@ -636,11 +587,10 @@ export default function Storefront() {
                 <Icons.X />
               </button>
             </div>
-
             <div style={styles.drawerBody}>
               {orderStatus === 'success' ? (
                 <div style={styles.successScreen}>
-                  <div style={styles.successIcon}>✅</div>
+                  <div style={{ ...styles.emptyIcon, background: '#dcfce7', borderRadius: '50%', width: 72, height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>✅</div>
                   <h3 style={{ fontSize: 20, fontWeight: 700, color: '#1a1a1a', marginBottom: 8 }}>تم إرسال طلبك!</h3>
                   <p style={{ color: '#888', fontSize: 15, marginBottom: 24 }}>سيتواصل معك فريقنا قريباً عبر واتساب</p>
                   <button style={{ ...styles.submitBtn, background: '#1a1a1a', maxWidth: 200, margin: '0 auto' }} onClick={resetOrder}>
@@ -666,26 +616,18 @@ export default function Storefront() {
                         }
                         <div style={styles.cartInfo}>
                           <div style={styles.cartName}>{item.name}</div>
-                          {item.isReservation && (
-                            <div style={{ fontSize: 11, color: '#f97316', marginBottom: 4 }}>⚠️ طلب حجز - سيُجهز قريباً</div>
-                          )}
+                          {item.isReservation && <div style={{ fontSize: 11, color: '#f97316', marginBottom: 4 }}>⚠️ طلب حجز - سيُجهز قريباً</div>}
                           <div style={styles.cartPrice}>{(item.price * item.cartQuantity).toLocaleString()} ر.س</div>
-                          <div style={{ ...styles.qtyRow, gap: 0 }}>
+                          <div style={styles.qtyRow}>
                             <button style={styles.qtyBtn} onClick={() => updateQty(item.id, 1)}><Icons.Plus /></button>
                             <span style={styles.qtyNum}>{item.cartQuantity}</span>
                             <button style={styles.qtyBtn} onClick={() => updateQty(item.id, -1)}><Icons.Minus /></button>
-                            <button
-                              style={{ marginRight: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 12, display: 'flex', alignItems: 'center' }}
-                              onClick={() => removeFromCart(item.id)}
-                            >
-                              حذف
-                            </button>
+                            <button style={{ marginRight: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 12, display: 'flex', alignItems: 'center' }} onClick={() => removeFromCart(item.id)}>حذف</button>
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
-
                   <div style={{ marginTop: 20, ...styles.form }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', marginBottom: 4 }}>بيانات التوصيل</div>
                     <input style={styles.input} placeholder="الاسم الكامل *" value={customer.name} onChange={e => setCustomer({ ...customer, name: e.target.value })} />
@@ -699,12 +641,7 @@ export default function Storefront() {
                         { val: 'card', label: '💳 بطاقة' },
                         { val: 'transfer', label: '🏦 تحويل' },
                       ].map(m => (
-                        <button
-                          key={m.val}
-                          style={styles.payBtn}
-                          className={paymentMethod === m.val ? 'pay-btn-active' : ''}
-                          onClick={() => setPaymentMethod(m.val)}
-                        >
+                        <button key={m.val} style={styles.payBtn} className={paymentMethod === m.val ? 'pay-btn-active' : ''} onClick={() => setPaymentMethod(m.val)}>
                           {m.label}
                         </button>
                       ))}
@@ -713,27 +650,14 @@ export default function Storefront() {
                 </>
               )}
             </div>
-
             {orderStatus !== 'success' && cart.length > 0 && (
               <div style={styles.drawerFooter}>
                 <div style={styles.totalRow}>
                   <span style={{ fontSize: 15, color: '#666' }}>الإجمالي</span>
                   <span style={{ fontSize: 22, fontWeight: 800, color: '#1a1a1a' }}>{totalPrice.toLocaleString()} ر.س</span>
                 </div>
-                <button
-                  style={styles.submitBtn}
-                  className="submit-btn"
-                  onClick={submitOrder}
-                  disabled={orderStatus === 'submitting'}
-                >
-                  {orderStatus === 'submitting' ? (
-                    <span>جاري التأكيد...</span>
-                  ) : (
-                    <>
-                      <Icons.Whatsapp />
-                      <span>تأكيد الطلب عبر واتساب</span>
-                    </>
-                  )}
+                <button style={styles.submitBtn} className="submit-btn" onClick={submitOrder} disabled={orderStatus === 'submitting'}>
+                  {orderStatus === 'submitting' ? 'جاري التأكيد...' : <><Icons.Whatsapp /><span>تأكيد الطلب عبر واتساب</span></>}
                 </button>
               </div>
             )}
