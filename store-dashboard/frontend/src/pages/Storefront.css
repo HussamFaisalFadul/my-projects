@@ -1,182 +1,39 @@
-.storefront {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
-  font-family: 'Tajawal', sans-serif;
-  direction: rtl;
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
+
+body {
+    font-family: 'Cairo', sans-serif;
+    -webkit-font-smoothing: antialiased;
 }
 
-.storefront-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  border-bottom: 2px solid #eee;
-  padding-bottom: 10px;
+/* حركة ظهور السلة من الجانب */
+@keyframes slide-left {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
 }
 
-.store-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.store-logo img { width: 50px; height: 50px; object-fit: cover; border-radius: 50%; }
-.store-logo span { font-size: 40px; }
-.store-logo h1 { font-size: 24px; margin: 0; }
-
-.cart-icon {
-  background: none;
-  border: none;
-  font-size: 28px;
-  cursor: pointer;
-  position: relative;
+.animate-in {
+    animation: slide-left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.store-description { color: #666; margin-bottom: 20px; }
+/* تأثير التدرج لخلفية الكروت */
+.product-card-gradient {
+    background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(248,250,252,1) 100%);
+}
 
-.products-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 20px;
+/* تحسين شكل السكرول بار */
+::-webkit-scrollbar {
+    width: 6px;
 }
-.product-card {
-  border: 1px solid #ddd;
-  border-radius: 12px;
-  padding: 12px;
-  text-align: center;
-  background: #fff;
-  transition: 0.2s;
-}
-.product-card img {
-  width: 100%;
-  height: 150px;
-  object-fit: cover;
-  border-radius: 8px;
-}
-.product-card h3 { margin: 10px 0 5px; font-size: 18px; }
-.price { font-weight: bold; color: #2c7da0; margin-bottom: 10px; }
-.product-card button {
-  background: #2c7da0;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  width: 100%;
-}
-.product-card button:disabled { background: #ccc; cursor: not-allowed; }
 
-.cart-sidebar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 380px;
-  height: 100%;
-  background: white;
-  box-shadow: -2px 0 12px rgba(0,0,0,0.2);
-  padding: 20px;
-  overflow-y: auto;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
 }
-.cart-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #eee;
-  padding-bottom: 10px;
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
 }
-.cart-header button {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }
-.cart-items {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.cart-item {
-  border-bottom: 1px solid #f0f0f0;
-  padding-bottom: 8px;
-}
-.cart-item-info {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-.cart-item-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.cart-item-controls button {
-  width: 28px;
-  height: 28px;
-  border: 1px solid #ccc;
-  background: white;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.remove-btn { background: #fee2e2 !important; color: #dc2626; }
-.cart-total {
-  font-weight: bold;
-  font-size: 18px;
-  text-align: left;
-  border-top: 2px solid #eee;
-  padding-top: 12px;
-}
-.customer-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.customer-form input, .customer-form textarea {
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  font-family: inherit;
-}
-.payment-methods { margin-top: 8px; }
-.payment-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 6px;
-}
-.payment-options label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-}
-.checkout-btn {
-  background: #2c7da0;
-  color: white;
-  border: none;
-  padding: 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: bold;
-}
-.whatsapp-link {
-  background: #dcf8e5;
-  padding: 12px;
-  border-radius: 8px;
-  text-align: center;
-}
-.whatsapp-link a {
-  display: inline-block;
-  background: #25d366;
-  color: white;
-  padding: 8px 16px;
-  border-radius: 30px;
-  text-decoration: none;
-  margin-top: 8px;
-}
-.error-msg { color: red; text-align: center; }
-.empty-cart { text-align: center; color: #888; }
