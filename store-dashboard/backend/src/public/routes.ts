@@ -5,7 +5,7 @@ import { addNotification } from '../db/queries';
 
 const router = Router();
 
-// جلب متجر بواسطة slug مع منتجاته النشطة
+// جلب متجر بواسطة slug مع منتجاته النشطة (مع حساب الكمية المتاحة = quantity - reserved_quantity)
 router.get('/stores/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
@@ -20,23 +20,27 @@ router.get('/stores/:slug', async (req, res) => {
     }
     const store = storeResult.rows[0];
 
-    // جلب المنتجات النشطة والتي لها كمية > 0
+    // جلب المنتجات النشطة مع الكمية الفعلية والمحجوزة
     const productsResult = await pool.query(
-      `SELECT id, name, price, quantity, image_url, description, category
+      `SELECT id, name, price, quantity, reserved_quantity, image_url, description, category
        FROM products 
-       WHERE store_id = $1 AND is_active = true AND quantity > 0
+       WHERE store_id = $1 AND is_active = true AND (quantity - COALESCE(reserved_quantity,0)) > 0
        ORDER BY created_at DESC`,
       [store.id]
     );
-    store.products = productsResult.rows;
+    // تحويل البيانات: إضافة حقل availableQuantity
+    store.products = productsResult.rows.map(p => ({
+      ...p,
+      availableQuantity: Math.max(0, p.quantity - (p.reserved_quantity || 0)),
+    }));
     res.json(store);
   } catch (err) {
-    console.error(err);
+    console.error('❌ خطأ في جلب المتجر العام:', err);
     res.status(500).json({ error: 'حدث خطأ في الخادم' });
   }
 });
 
-// إنشاء طلب جديد من العميل (بدون تسجيل دخول)
+// إنشاء طلب جديد من العميل (يدعم الحجوزات)
 router.post('/orders', async (req, res) => {
   const client = await pool.connect();
   try {
@@ -54,24 +58,51 @@ router.post('/orders', async (req, res) => {
     );
     const order = orderResult.rows[0];
 
-    // إدراج عناصر الطلب وتحديث المخزون
+    // معالجة كل عنصر في الطلب
     for (const item of items) {
+      const isReservation = item.isReservation === true;
+      const productId = item.productId;
+
+      // إدراج عنصر الطلب مع حقل is_reservation
       await client.query(
-        `INSERT INTO order_items (order_id, product_id, product_name, quantity, price)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [order.id, item.productId, item.productName, item.quantity, item.price]
+        `INSERT INTO order_items (order_id, product_id, product_name, quantity, price, is_reservation, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [order.id, productId, item.productName, item.quantity, item.price, isReservation, isReservation ? 'حجز' : '']
       );
-      // تنزيل الكمية من المنتج
-      await client.query(
-        `UPDATE products SET quantity = GREATEST(0, quantity - $1) WHERE id = $2`,
-        [item.quantity, item.productId]
-      );
+
+      if (isReservation) {
+        // حجز: نزيد reserved_quantity فقط، لا نغير المخزون الفعلي
+        await client.query(
+          `UPDATE products 
+           SET reserved_quantity = reserved_quantity + $1, updated_at = NOW()
+           WHERE id = $2`,
+          [item.quantity, productId]
+        );
+      } else {
+        // بيع عادي: نخفض المخزون الفعلي
+        const current = await client.query(
+          'SELECT quantity FROM products WHERE id = $1 FOR UPDATE',
+          [productId]
+        );
+        const before = current.rows[0]?.quantity ?? 0;
+        const after = Math.max(0, before - item.quantity);
+        await client.query(
+          'UPDATE products SET quantity = $1, updated_at = NOW() WHERE id = $2',
+          [after, productId]
+        );
+        // تسجيل حركة المخزون (sale)
+        await client.query(
+          `INSERT INTO stock_movements (product_id, store_id, type, quantity_change, quantity_before, quantity_after, unit_price, note)
+           VALUES ($1, $2, 'sale', $3, $4, $5, $6, $7)`,
+          [productId, storeId, -item.quantity, before, after, item.price, `طلب #${order.id.slice(0, 8)}`]
+        );
+      }
     }
 
     await client.query('COMMIT');
 
     // إشعار فوري لصاحب المتجر (عبر WebSocket)
-    const io = req.app.get('io'); // نحتاج تمرير io إلى الميدلوير
+    const io = req.app.get('io');
     if (io) {
       io.to(storeId).emit('order_added', order);
       io.to(storeId).emit('notification', {
@@ -92,7 +123,7 @@ router.post('/orders', async (req, res) => {
     res.status(201).json({ success: true, orderId: order.id });
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error(err);
+    console.error('❌ خطأ في إنشاء الطلب العام:', err);
     res.status(500).json({ error: 'فشل إنشاء الطلب' });
   } finally {
     client.release();
