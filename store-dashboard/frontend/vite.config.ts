@@ -3,11 +3,10 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  // لا تضع lucide-react في external، بل اتركه يُضمّن في الحزمة
+  // لا تضع lucide-react في external – يجب أن يُضمّن في الحزمة
   build: {
     rollupOptions: {
-      // إذا أردت استثناء شيء، لكن ليس lucide-react
-      // external: []  
+      // external: []   // احذف هذا السطر تماماً
     },
   },
 })
