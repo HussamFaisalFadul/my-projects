@@ -35,6 +35,7 @@ type ExtendedProduct = ApiProduct & {
   is_active?: boolean;
   tagsText?: string;
   supplierId?: string;
+  reservedQuantity?: number;  // ← تمت الإضافة
 };
 
 type ViewMode = 'grid' | 'table';
@@ -532,6 +533,9 @@ export default function Products() {
     );
   };
 
+  // حساب إجمالي الحجوزات (اختياري)
+  const totalReserved = useMemo(() => products.reduce((sum, p) => sum + (p.reservedQuantity || 0), 0), [products]);
+
   return (
     <div className="products-page" dir="rtl">
       {showScanner && (
@@ -564,6 +568,12 @@ export default function Products() {
         <div className="stat-card warning"><span>{t('products.lowStockCount')}</span><strong>{lowStockCount}</strong></div>
         <div className="stat-card"><span>{t('products.withImages')}</span><strong>{imageCount}</strong></div>
         <div className="stat-card"><span>{t('products.totalValue')}</span><strong>{formatMoney(totalValue, t)}</strong></div>
+        {totalReserved > 0 && (
+          <div className="stat-card amber" style={{ borderRightColor: '#f59e0b' }}>
+            <span>محجوز (لم يُخصم)</span>
+            <strong>{totalReserved}</strong>
+          </div>
+        )}
       </div>
 
       <div className="filters-panel">
@@ -638,6 +648,11 @@ export default function Products() {
                     <div><span>{t('products.minQuantity')}</span><strong>{p.minQuantity ?? 5}</strong></div>
                     <div><span>{t('products.sku')}</span><strong>{p.sku || '—'}</strong></div>
                     <div><span>{t('products.barcode')}</span><strong>{p.barcode || '—'}</strong></div>
+                    {/* عرض الكمية المحجوزة */}
+                    <div>
+                      <span>{t('products.reserved') || 'محجوز'}</span>
+                      <strong>{p.reservedQuantity ?? 0}</strong>
+                    </div>
                   </div>
                   {mode === 'advanced' && (
                     <div className="extra-lines">
@@ -675,6 +690,7 @@ export default function Products() {
                 <th>{t('products.status')}</th>
                 {mode === 'advanced' && <th>{t('products.sku')}</th>}
                 {mode === 'advanced' && <th>{t('products.barcode')}</th>}
+                {mode === 'advanced' && <th>{t('products.reserved') || 'محجوز'}</th>}
                 <th>{t('products.actions')}</th>
               </tr>
             </thead>
@@ -714,6 +730,7 @@ export default function Products() {
                     <td>{p.isActive === false ? t('products.inactive') : t('products.active')}</td>
                     {mode === 'advanced' && <td>{p.sku || '—'}</td>}
                     {mode === 'advanced' && <td>{p.barcode || '—'}</td>}
+                    {mode === 'advanced' && <td>{p.reservedQuantity ?? 0}</td>}
                     <td>
                       <div className="action-btns">
                         <button className="btn-edit" onClick={() => handleEdit(p)} type="button">{t('common.edit')}</button>
