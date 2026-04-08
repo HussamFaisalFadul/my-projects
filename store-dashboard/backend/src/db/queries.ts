@@ -91,16 +91,17 @@ export async function addProduct(data: any): Promise<Product> {
 
     const result = await client.query(
       `INSERT INTO products 
-      (store_id, name, price, quantity, category, min_quantity, image_url,
+      (store_id, name, price, quantity, reserved_quantity, category, min_quantity, image_url,
        sku, barcode, description, brand, cost_price, sale_price, sale_start, sale_end,
        weight_kg, tax_rate, unit, is_active, tags, status)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
       RETURNING *`,
       [
         data.storeId,
         data.name,
         data.price,
         data.quantity ?? 0,
+        0, // reserved_quantity يبدأ بـ 0
         data.category || '',
         data.minQuantity ?? 5,
         data.imageUrl || null,
@@ -122,7 +123,7 @@ export async function addProduct(data: any): Promise<Product> {
     );
     const product = result.rows[0];
 
-    // حفظ الصور (روابط Cloudinary)
+    // حفظ الصور
     if (data.images && data.images.length > 0) {
       for (const img of data.images) {
         await client.query(
@@ -144,7 +145,7 @@ export async function addProduct(data: any): Promise<Product> {
       }
     }
 
-    // تسجيل حركة المخزون الأولية (شراء)
+    // تسجيل حركة المخزون الأولية
     if ((data.quantity ?? 0) > 0) {
       await client.query(
         `INSERT INTO stock_movements (product_id, store_id, type, quantity_change, quantity_before, quantity_after, note, created_by)
@@ -174,6 +175,7 @@ export async function updateProduct(id: string, data: any): Promise<Product | nu
 
     const fieldMap: Record<string, string> = {
       name: 'name', price: 'price', quantity: 'quantity',
+      reserved_quantity: 'reserved_quantity',
       category: 'category', minQuantity: 'min_quantity', imageUrl: 'image_url',
       sku: 'sku', barcode: 'barcode', description: 'description', brand: 'brand',
       costPrice: 'cost_price', salePrice: 'sale_price', saleStart: 'sale_start',
@@ -207,7 +209,7 @@ export async function updateProduct(id: string, data: any): Promise<Product | nu
 
     if (!product) { await client.query('ROLLBACK'); return null; }
 
-    // تحديث الصور — حذف القديمة وإضافة الجديدة
+    // تحديث الصور
     if (data.images !== undefined) {
       await client.query('DELETE FROM product_images WHERE product_id = $1', [id]);
       for (const img of data.images) {
@@ -233,7 +235,6 @@ export async function updateProduct(id: string, data: any): Promise<Product | nu
 
     await client.query('COMMIT');
 
-    // جلب الصور المحدثة
     const imagesResult = await pool.query('SELECT * FROM product_images WHERE product_id = $1 ORDER BY sort_order', [id]);
     return mapProduct({ ...product, images: imagesResult.rows });
   } catch (err) {
@@ -249,7 +250,7 @@ export async function deleteProduct(id: string): Promise<boolean> {
   return (result.rowCount ?? 0) > 0;
 }
 
-// ===== دوال إضافية للصور والمتغيرات =====
+// ===== دوال الصور والمتغيرات (بدون تغيير) =====
 
 export async function addProductImage(
   productId: string,
@@ -311,7 +312,7 @@ export async function deleteProductVariant(variantId: string) {
   await pool.query('DELETE FROM product_variants WHERE id = $1', [variantId]);
 }
 
-// ===== حركة المخزون (نسخة كاملة مع تحديث المنتج) =====
+// ===== حركة المخزون (مع دعم reserved_quantity) =====
 
 export async function addStockMovement(data: {
   productId: string;
@@ -328,21 +329,22 @@ export async function addStockMovement(data: {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    // تحديث المخزون الفعلي (quantity) أو المحجوز (reserved_quantity) حسب نوع الحركة
+    // هنا نحدّث quantity فقط (لأن الحجوزات لها منطق منفصل في addOrder)
     await client.query(
       'UPDATE products SET quantity = $1, updated_at = NOW() WHERE id = $2',
       [data.quantityAfter, data.productId]
     );
     const result = await client.query(
-  `INSERT INTO stock_movements 
-  (product_id, store_id, type, quantity, quantity_change, quantity_before, quantity_after, unit_price, note, created_by)
-  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-  [
-    data.productId, data.storeId,
-    data.type, Math.abs(data.quantityChange),
-    data.quantityChange, data.quantityBefore, data.quantityAfter,
-    data.unitPrice || 0, data.note || null, data.createdBy || null
-  ]
-);
+      `INSERT INTO stock_movements 
+      (product_id, store_id, variant_id, type, quantity_change, quantity_before, quantity_after, unit_price, note, created_by)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [
+        data.productId, data.storeId, data.variantId || null,
+        data.type, data.quantityChange, data.quantityBefore, data.quantityAfter,
+        data.unitPrice || 0, data.note || null, data.createdBy || null
+      ]
+    );
     await client.query('COMMIT');
     return result.rows[0];
   } catch (err) {
@@ -361,7 +363,7 @@ export async function getStockMovements(productId: string): Promise<any[]> {
   return result.rows.map(mapStockMovement);
 }
 
-// ===== الطلبات =====
+// ===== الطلبات (مع دعم الحجوزات) =====
 
 export async function getOrders(storeId: string): Promise<Order[]> {
   const ordersResult = await pool.query(
@@ -385,11 +387,12 @@ export async function getOrders(storeId: string): Promise<Order[]> {
         productName: item.product_name,
         quantity: item.quantity,
         price: parseFloat(item.price),
+        isReservation: item.is_reservation || false, // نضيف هذا الحقل
       }))
   }));
 }
 
-export async function addOrder(data: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>): Promise<Order> {
+export async function addOrder(data: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> & { items: any[] }): Promise<Order> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -402,30 +405,43 @@ export async function addOrder(data: Omit<Order, 'id' | 'createdAt' | 'updatedAt
     const order = orderResult.rows[0];
 
     for (const item of data.items) {
+      const isReservation = item.isReservation === true;
+      // إضافة عنصر الطلب مع حقل is_reservation (سنضيفه إلى جدول order_items)
       await client.query(
-        `INSERT INTO order_items (order_id, product_id, product_name, quantity, price)
-         VALUES ($1,$2,$3,$4,$5)`,
-        [order.id, item.productId, item.productName, item.quantity, item.price]
+        `INSERT INTO order_items (order_id, product_id, product_name, quantity, price, is_reservation, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [
+          order.id, item.productId, item.productName, item.quantity,
+          item.price, isReservation, isReservation ? 'حجز' : ''
+        ]
       );
 
-      // تحديث المخزون مع تسجيل حركة البيع
-      const current = await client.query(
-        'SELECT quantity FROM products WHERE id = $1 FOR UPDATE',
-        [item.productId]
-      );
-      const before = current.rows[0]?.quantity ?? 0;
-      const after = Math.max(0, before - item.quantity);
-
-      await client.query(
-        'UPDATE products SET quantity = $1, updated_at = NOW() WHERE id = $2',
-        [after, item.productId]
-      );
-
-      await client.query(
-        `INSERT INTO stock_movements (product_id, store_id, type, quantity_change, quantity_before, quantity_after, unit_price, note)
-         VALUES ($1,$2,'sale',$3,$4,$5,$6,$7)`,
-        [item.productId, data.storeId, -item.quantity, before, after, item.price, `طلب #${order.id.slice(0, 8)}`]
-      );
+      if (isReservation) {
+        // حجز: نزيد reserved_quantity فقط (لا ننقص المخزون الفعلي)
+        await client.query(
+          `UPDATE products SET reserved_quantity = reserved_quantity + $1, updated_at = NOW()
+           WHERE id = $2`,
+          [item.quantity, item.productId]
+        );
+      } else {
+        // بيع عادي: ننقص المخزون الفعلي (quantity)
+        const current = await client.query(
+          'SELECT quantity FROM products WHERE id = $1 FOR UPDATE',
+          [item.productId]
+        );
+        const before = current.rows[0]?.quantity ?? 0;
+        const after = Math.max(0, before - item.quantity);
+        await client.query(
+          'UPDATE products SET quantity = $1, updated_at = NOW() WHERE id = $2',
+          [after, item.productId]
+        );
+        // تسجيل حركة المخزون
+        await client.query(
+          `INSERT INTO stock_movements (product_id, store_id, type, quantity_change, quantity_before, quantity_after, unit_price, note)
+           VALUES ($1,$2,'sale',$3,$4,$5,$6,$7)`,
+          [item.productId, data.storeId, -item.quantity, before, after, item.price, `طلب #${order.id.slice(0, 8)}`]
+        );
+      }
     }
 
     await client.query('COMMIT');
@@ -452,6 +468,7 @@ export async function updateOrderStatus(id: string, status: Order['status']): Pr
       productName: i.product_name,
       quantity: i.quantity,
       price: parseFloat(i.price),
+      isReservation: i.is_reservation || false,
     }))
   };
 }
@@ -523,6 +540,7 @@ function mapProduct(row: any): Product {
     name: row.name,
     price: parseFloat(row.price),
     quantity: row.quantity,
+    reservedQuantity: row.reserved_quantity ?? 0,
     category: row.category,
     minQuantity: row.min_quantity,
     imageUrl: row.image_url ?? undefined,
