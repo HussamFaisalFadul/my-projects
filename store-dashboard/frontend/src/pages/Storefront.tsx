@@ -7,7 +7,9 @@ interface Product {
   id: string;
   name: string;
   price: number;
-  quantity: number;
+  quantity: number;          // المخزون الفعلي
+  reserved_quantity?: number; // الكمية المحجوزة
+  availableQuantity?: number; // المتاح للبيع (quantity - reserved_quantity)
   image_url?: string;
   description?: string;
   category?: string;
@@ -15,6 +17,7 @@ interface Product {
 
 interface CartItem extends Product {
   cartQuantity: number;
+  isReservation: boolean;    // هل هذا المنتج حجز؟
 }
 
 type PaymentMethod = 'cash' | 'card' | 'transfer' | 'whatsapp';
@@ -34,6 +37,7 @@ export default function Storefront() {
   const [orderStatus, setOrderStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [whatsappLink, setWhatsappLink] = useState('');
 
+  // تحميل بيانات المتجر
   useEffect(() => {
     if (!slug) {
       setError('رابط غير صحيح');
@@ -47,6 +51,13 @@ export default function Storefront() {
       })
       .then(data => {
         if (data.error) throw new Error(data.error);
+        // حساب availableQuantity إذا لم يرسله الخادم
+        if (data.products) {
+          data.products = data.products.map((p: any) => ({
+            ...p,
+            availableQuantity: p.availableQuantity ?? (p.quantity - (p.reserved_quantity || 0)),
+          }));
+        }
         setStore(data);
       })
       .catch(err => {
@@ -56,53 +67,106 @@ export default function Storefront() {
       .finally(() => setLoading(false));
   }, [slug]);
 
+  // تحميل السلة من localStorage
   useEffect(() => {
     const savedCart = localStorage.getItem(`cart_${slug}`);
     if (savedCart) setCart(JSON.parse(savedCart));
   }, [slug]);
 
+  // حفظ السلة
   useEffect(() => {
     localStorage.setItem(`cart_${slug}`, JSON.stringify(cart));
   }, [cart, slug]);
 
-  // ✅ دالة addToCart مع التحقق من المخزون
+  // إضافة منتج إلى السلة (مع دعم الحجز)
   const addToCart = (product: Product) => {
-    if (product.quantity === 0) {
-      alert('هذا المنتج غير متوفر حالياً');
+    const available = product.availableQuantity ?? product.quantity;
+    if (available <= 0) {
+      const confirmReserve = window.confirm(
+        `"${product.name}" غير متوفر حالياً. هل تريد طلبه كحجز؟ (سيتم إشعارك عند توفره)`
+      );
+      if (!confirmReserve) return;
+      // إضافة كحجز (حتى لو الكمية 0)
+      setCart(prev => {
+        const existing = prev.find(p => p.id === product.id);
+        if (existing) {
+          return prev.map(p =>
+            p.id === product.id
+              ? { ...p, cartQuantity: p.cartQuantity + 1, isReservation: true }
+              : p
+          );
+        }
+        return [
+          ...prev,
+          {
+            ...product,
+            cartQuantity: 1,
+            isReservation: true,
+            availableQuantity: product.availableQuantity,
+          },
+        ];
+      });
       return;
     }
+
+    // المنتج متوفر
     setCart(prev => {
       const existing = prev.find(p => p.id === product.id);
-      const currentQtyInCart = existing ? existing.cartQuantity : 0;
-      const newQty = currentQtyInCart + 1;
-      
-      if (newQty > product.quantity) {
-        alert(`⚠️ لا يمكن إضافة ${newQty} قطع. الحد الأقصى المتاح هو ${product.quantity}.`);
-        return prev;
+      let currentQty = existing ? existing.cartQuantity : 0;
+      let newQty = currentQty + 1;
+      let isReservation = false;
+
+      // إذا تجاوزت الكمية المتاحة، نحول إلى حجز
+      if (newQty > available) {
+        const confirmReserve = window.confirm(
+          `⚠️ الكمية المطلوبة (${newQty}) تتجاوز المتاح (${available}). هل تريد طلب الكمية الزائدة كحجز؟`
+        );
+        if (!confirmReserve) return prev;
+        isReservation = true;
+        // نحدد الكمية القصوى كحجز (نأخذ كل الكمية كحجز لتجنب التعقيد)
+        // لكن يمكننا تقسيم: جزء متاح وجزء حجز. للتبسيط: نعتبر كل الكمية حجز.
+        // في تطبيق حقيقي، يمكن تعديل المنطق.
+        // هنا سنعتبر أن المستخدم يريد الكمية كلها كحجز.
+        // لذلك نضبط newQty كما هي، ونجعل isReservation = true.
       }
-      
+
       if (existing) {
         return prev.map(p =>
-          p.id === product.id ? { ...p, cartQuantity: newQty } : p
+          p.id === product.id
+            ? { ...p, cartQuantity: newQty, isReservation: isReservation || p.isReservation }
+            : p
         );
       }
-      return [...prev, { ...product, cartQuantity: 1 }];
+      return [
+        ...prev,
+        {
+          ...product,
+          cartQuantity: newQty,
+          isReservation,
+          availableQuantity: product.availableQuantity,
+        },
+      ];
     });
   };
 
-  // ✅ دالة updateQuantity مع التحقق من المخزون
+  // تحديث الكمية
   const updateQuantity = (productId: string, delta: number) => {
     setCart(prev =>
       prev
         .map(p => {
           if (p.id !== productId) return p;
-          const newQty = p.cartQuantity + delta;
+          let newQty = p.cartQuantity + delta;
           if (newQty < 1) return null;
-          if (newQty > p.quantity) {
-            alert(`⚠️ لا يمكن تعديل الكمية إلى ${newQty}. المتاح فقط ${p.quantity}.`);
-            return p;
+          const available = p.availableQuantity ?? p.quantity;
+          let isReservation = p.isReservation;
+          if (!isReservation && newQty > available) {
+            const confirmReserve = window.confirm(
+              `⚠️ الكمية المطلوبة (${newQty}) تتجاوز المتاح (${available}). هل تريد تحويل الكمية الزائدة إلى حجز؟`
+            );
+            if (!confirmReserve) return p;
+            isReservation = true;
           }
-          return { ...p, cartQuantity: newQty };
+          return { ...p, cartQuantity: newQty, isReservation };
         })
         .filter(Boolean) as CartItem[]
     );
@@ -114,6 +178,7 @@ export default function Storefront() {
 
   const totalPrice = cart.reduce((sum, item) => sum + item.price * item.cartQuantity, 0);
 
+  // إرسال الطلب
   const handleSubmitOrder = async () => {
     if (!customerName || !customerPhone) {
       alert('يرجى إدخال الاسم ورقم الجوال');
@@ -125,6 +190,13 @@ export default function Storefront() {
     }
     setOrderStatus('submitting');
     try {
+      const itemsToSend = cart.map(item => ({
+        productId: item.id,
+        productName: item.name,
+        quantity: item.cartQuantity,
+        price: item.price,
+        isReservation: item.isReservation,
+      }));
       const res = await fetch(`${BACKEND}/api/public/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -132,12 +204,7 @@ export default function Storefront() {
           storeId: store.id,
           customerName,
           customerPhone,
-          items: cart.map(item => ({
-            productId: item.id,
-            productName: item.name,
-            quantity: item.cartQuantity,
-            price: item.price,
-          })),
+          items: itemsToSend,
           totalPrice,
           notes: `${notes}\nالعنوان: ${customerAddress}\nطريقة الدفع: ${paymentMethod}`,
         }),
@@ -145,9 +212,12 @@ export default function Storefront() {
       const data = await res.json();
       if (data.success) {
         setOrderStatus('success');
+        const reservationMsg = cart.some(i => i.isReservation)
+          ? '\n⚠️ بعض المنتجات غير متوفرة وتم طلبها كحجز.'
+          : '';
         const message = `مرحباً، أود طلب:\n${cart
-          .map(i => `${i.name} × ${i.cartQuantity} = ${i.price * i.cartQuantity} ريال`)
-          .join('\n')}\nالإجمالي: ${totalPrice} ريال\nالاسم: ${customerName}\nالجوال: ${customerPhone}\nالعنوان: ${customerAddress || 'غير محدد'}\nملاحظات: ${notes || 'لا توجد'}\nطريقة الدفع: ${paymentMethod === 'cash' ? 'كاش' : paymentMethod === 'card' ? 'بطاقة' : paymentMethod === 'transfer' ? 'تحويل' : 'واتساب'}`;
+          .map(i => `${i.name} × ${i.cartQuantity} = ${i.price * i.cartQuantity} ريال${i.isReservation ? ' (حجز)' : ''}`)
+          .join('\n')}\nالإجمالي: ${totalPrice} ريال\nالاسم: ${customerName}\nالجوال: ${customerPhone}\nالعنوان: ${customerAddress || 'غير محدد'}\nملاحظات: ${notes || 'لا توجد'}\nطريقة الدفع: ${paymentMethod === 'cash' ? 'كاش' : paymentMethod === 'card' ? 'بطاقة' : paymentMethod === 'transfer' ? 'تحويل' : 'واتساب'}${reservationMsg}`;
         const phone = store.owner_phone || '';
         setWhatsappLink(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
         setCart([]);
@@ -183,17 +253,23 @@ export default function Storefront() {
         <p className="no-products">لا توجد منتجات متاحة حالياً</p>
       ) : (
         <div className="products-grid">
-          {store.products.map((product: Product) => (
-            <div key={product.id} className="product-card">
-              {product.image_url && <img src={product.image_url} alt={product.name} />}
-              <h3>{product.name}</h3>
-              <p className="price">{product.price} ريال</p>
-              <p className="stock-info">المتبقي: {product.quantity}</p>
-              <button onClick={() => addToCart(product)} disabled={product.quantity === 0}>
-                {product.quantity > 0 ? 'أضف للسلة' : 'غير متوفر'}
-              </button>
-            </div>
-          ))}
+          {store.products.map((product: Product) => {
+            const available = product.availableQuantity ?? product.quantity;
+            return (
+              <div key={product.id} className="product-card">
+                {product.image_url && <img src={product.image_url} alt={product.name} />}
+                <h3>{product.name}</h3>
+                <p className="price">{product.price} ريال</p>
+                <p className="stock-info">
+                  المتاح: {Math.max(0, available)}
+                  {product.reserved_quantity > 0 && ` (محجوز: ${product.reserved_quantity})`}
+                </p>
+                <button onClick={() => addToCart(product)} disabled={available <= 0 && false}>
+                  {available > 0 ? 'أضف للسلة' : 'طلب حجز'}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -214,7 +290,13 @@ export default function Storefront() {
                       <span className="cart-item-name">{item.name}</span>
                       <span className="cart-item-price">{item.price} ريال</span>
                     </div>
-                    <div className="cart-item-stock">المتبقي في المخزون: {item.quantity}</div>
+                    <div className="cart-item-stock">
+                      {item.isReservation ? (
+                        <span className="reservation-badge">⚠️ حجز (غير متوفر حالياً)</span>
+                      ) : (
+                        <span>المتبقي في المخزون: {Math.max(0, (item.availableQuantity ?? item.quantity))}</span>
+                      )}
+                    </div>
                     <div className="cart-item-controls">
                       <button onClick={() => updateQuantity(item.id, -1)}>-</button>
                       <span>{item.cartQuantity}</span>
@@ -227,33 +309,96 @@ export default function Storefront() {
               <div className="cart-total">الإجمالي: {totalPrice} ريال</div>
 
               <div className="customer-form">
-                <input type="text" placeholder="الاسم الكامل *" value={customerName} onChange={e => setCustomerName(e.target.value)} />
-                <input type="tel" placeholder="رقم الجوال *" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
-                <input type="text" placeholder="العنوان (اختياري)" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} />
-                <textarea placeholder="ملاحظات إضافية (اختياري)" value={notes} onChange={e => setNotes(e.target.value)} />
+                <input
+                  type="text"
+                  placeholder="الاسم الكامل *"
+                  value={customerName}
+                  onChange={e => setCustomerName(e.target.value)}
+                />
+                <input
+                  type="tel"
+                  placeholder="رقم الجوال *"
+                  value={customerPhone}
+                  onChange={e => setCustomerPhone(e.target.value)}
+                />
+                <input
+                  type="text"
+                  placeholder="العنوان (اختياري)"
+                  value={customerAddress}
+                  onChange={e => setCustomerAddress(e.target.value)}
+                />
+                <textarea
+                  placeholder="ملاحظات إضافية (اختياري)"
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                />
               </div>
 
               <div className="payment-methods">
                 <p>طريقة الدفع:</p>
                 <div className="payment-options">
-                  <label><input type="radio" name="payment" value="cash" checked={paymentMethod === 'cash'} onChange={() => setPaymentMethod('cash')} /> 💵 كاش</label>
-                  <label><input type="radio" name="payment" value="card" checked={paymentMethod === 'card'} onChange={() => setPaymentMethod('card')} /> 💳 بطاقة</label>
-                  <label><input type="radio" name="payment" value="transfer" checked={paymentMethod === 'transfer'} onChange={() => setPaymentMethod('transfer')} /> 📱 تحويل بنكي</label>
-                  <label><input type="radio" name="payment" value="whatsapp" checked={paymentMethod === 'whatsapp'} onChange={() => setPaymentMethod('whatsapp')} /> 📱 واتساب (دردشة)</label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="payment"
+                      value="cash"
+                      checked={paymentMethod === 'cash'}
+                      onChange={() => setPaymentMethod('cash')}
+                    />{' '}
+                    💵 كاش
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="payment"
+                      value="card"
+                      checked={paymentMethod === 'card'}
+                      onChange={() => setPaymentMethod('card')}
+                    />{' '}
+                    💳 بطاقة
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="payment"
+                      value="transfer"
+                      checked={paymentMethod === 'transfer'}
+                      onChange={() => setPaymentMethod('transfer')}
+                    />{' '}
+                    📱 تحويل بنكي
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="payment"
+                      value="whatsapp"
+                      checked={paymentMethod === 'whatsapp'}
+                      onChange={() => setPaymentMethod('whatsapp')}
+                    />{' '}
+                    📱 واتساب (دردشة)
+                  </label>
                 </div>
               </div>
 
-              <button className="checkout-btn" onClick={handleSubmitOrder} disabled={orderStatus === 'submitting'}>
+              <button
+                className="checkout-btn"
+                onClick={handleSubmitOrder}
+                disabled={orderStatus === 'submitting'}
+              >
                 {orderStatus === 'submitting' ? 'جاري الإرسال...' : 'تأكيد الطلب'}
               </button>
 
               {orderStatus === 'success' && whatsappLink && (
                 <div className="whatsapp-link">
                   <p>✅ تم استلام طلبك! يرجى تأكيد الطلب عبر واتساب:</p>
-                  <a href={whatsappLink} target="_blank" rel="noopener noreferrer">📱 افتح واتساب</a>
+                  <a href={whatsappLink} target="_blank" rel="noopener noreferrer">
+                    📱 افتح واتساب
+                  </a>
                 </div>
               )}
-              {orderStatus === 'error' && <p className="error-msg">❌ حدث خطأ، حاول مرة أخرى.</p>}
+              {orderStatus === 'error' && (
+                <p className="error-msg">❌ حدث خطأ، حاول مرة أخرى.</p>
+              )}
             </>
           )}
         </div>
