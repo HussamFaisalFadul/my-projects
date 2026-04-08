@@ -1,114 +1,59 @@
 import { useEffect, useState, useMemo } from 'react';
-import { 
-  ShoppingBag, X, Plus, Minus, Trash2, 
-  ChevronLeft, MapPin, Phone, User, 
-  CreditCard, MessageSquare, ShoppingCart, 
-  Info, CheckCircle
-} from 'lucide-react';
 import './Storefront.css';
 
 const BACKEND = 'https://store-dashboard-backend.onrender.com';
 
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-  reserved_quantity?: number;
-  availableQuantity?: number;
-  image_url?: string;
-  description?: string;
-  category?: string;
-}
-
-interface CartItem extends Product {
-  cartQuantity: number;
-  isReservation: boolean;
-}
+// أيقونات SVG مدمجة (لا تحتاج لمكتبات)
+const Icons = {
+  Cart: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>,
+  Trash: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
+  X: () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  Plus: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  Minus: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+};
 
 export default function Storefront() {
   const slug = window.location.pathname.split('/store/')[1];
   const [store, setStore] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<any[]>([]);
   const [showCart, setShowCart] = useState(false);
-  
-  // حقول العميل
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [customerAddress, setCustomerAddress] = useState('');
-  const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [orderStatus, setOrderStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
-  const [whatsappLink, setWhatsappLink] = useState('');
+  const [orderStatus, setOrderStatus] = useState<'idle'|'sending'|'success'>('idle');
 
-  // جلب البيانات من السيرفر
+  // حقول العميل
+  const [customer, setCustomer] = useState({ name: '', phone: '', address: '' });
+
   useEffect(() => {
-    if (!slug) {
-      setError('رابط المتجر غير صالح');
-      setLoading(false);
-      return;
-    }
+    if (!slug) return;
     fetch(`${BACKEND}/api/public/stores/${slug}`)
       .then(res => res.json())
       .then(data => {
-        if (data.error) throw new Error(data.error);
-        // معالجة الكميات المتاحة
-        const processedProducts = data.products?.map((p: any) => ({
-          ...p,
-          availableQuantity: p.availableQuantity ?? (p.quantity - (p.reserved_quantity || 0)),
-        }));
-        setStore({ ...data, products: processedProducts });
+        setStore(data);
         setLoading(false);
       })
-      .catch(err => {
-        setError(err.message);
-        setLoading(false);
-      });
+      .catch(() => setLoading(false));
   }, [slug]);
 
-  // إدارة السلة (LocalStorage)
-  useEffect(() => {
-    const saved = localStorage.getItem(`cart_${slug}`);
-    if (saved) setCart(JSON.parse(saved));
-  }, [slug]);
+  // الحسابات البرمجية
+  const totalPrice = useMemo(() => cart.reduce((sum, item) => sum + (item.price * item.cartQuantity), 0), [cart]);
+  const totalItems = useMemo(() => cart.reduce((sum, item) => sum + item.cartQuantity, 0), [cart]);
 
-  useEffect(() => {
-    localStorage.setItem(`cart_${slug}`, JSON.stringify(cart));
-  }, [cart, slug]);
-
-  // الحسابات
-  const totalItems = useMemo(() => cart.reduce((s, i) => s + i.cartQuantity, 0), [cart]);
-  const totalPrice = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.cartQuantity, 0), [cart]);
-
-  // وظائف السلة
-  const addToCart = (product: Product) => {
-    const available = product.availableQuantity ?? 0;
-    const existing = cart.find(p => p.id === product.id);
-    
+  const addToCart = (product: any) => {
     setCart(prev => {
-      if (existing) {
-        return prev.map(p => p.id === product.id ? { ...p, cartQuantity: p.cartQuantity + 1 } : p);
-      }
-      return [...prev, { ...product, cartQuantity: 1, isReservation: available <= 0 }];
+      const exists = prev.find(p => p.id === product.id);
+      if (exists) return prev.map(p => p.id === product.id ? {...p, cartQuantity: p.cartQuantity + 1} : p);
+      return [...prev, {...product, cartQuantity: 1}];
     });
     setShowCart(true);
   };
 
-  const updateQuantity = (id: string, delta: number) => {
-    setCart(prev => prev.map(p => p.id === id ? { ...p, cartQuantity: Math.max(1, p.cartQuantity + delta) } : p));
+  const updateQty = (id: string, delta: number) => {
+    setCart(prev => prev.map(p => p.id === id ? {...p, cartQuantity: Math.max(1, p.cartQuantity + delta)} : p));
   };
 
-  const removeItem = (id: string) => setCart(prev => prev.filter(p => p.id !== id));
-
-  // إرسال الطلب
-  const handleSubmitOrder = async () => {
-    if (!customerName || !customerPhone) {
-      alert('يرجى إدخال الاسم ورقم الجوال');
-      return;
-    }
-    setOrderStatus('submitting');
+  const submitOrder = async () => {
+    if (!customer.name || !customer.phone) return alert('يرجى ملء البيانات');
+    setOrderStatus('sending');
     
     try {
       const res = await fetch(`${BACKEND}/api/public/orders`, {
@@ -116,166 +61,108 @@ export default function Storefront() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           storeId: store.id,
-          customerName,
-          customerPhone,
-          items: cart.map(i => ({
-            productId: i.id,
-            productName: i.name,
-            quantity: i.cartQuantity,
-            price: i.price,
-            isReservation: i.isReservation
-          })),
+          customerName: customer.name,
+          customerPhone: customer.phone,
+          items: cart,
           totalPrice,
-          notes: `${notes}\nالعنوان: ${customerAddress}\nالدفع: ${paymentMethod}`,
-        }),
+          notes: `العنوان: ${customer.address}`
+        })
       });
-      
-      const data = await res.json();
-      if (data.success) {
+      if (res.ok) {
         setOrderStatus('success');
-        const message = `مرحباً ${store.name}، أود تأكيد الطلب:\n` + 
-                        cart.map(i => `- ${i.name} (${i.cartQuantity})`).join('\n') + 
-                        `\nالإجمالي: ${totalPrice} ريال\nالاسم: ${customerName}`;
-        setWhatsappLink(`https://wa.me/${store.owner_phone}?text=${encodeURIComponent(message)}`);
+        const waMsg = `طلب جديد من: ${customer.name}\nالمجموع: ${totalPrice} ريال`;
+        window.open(`https://wa.me/${store.owner_phone}?text=${encodeURIComponent(waMsg)}`, '_blank');
         setCart([]);
-        localStorage.removeItem(`cart_${slug}`);
       }
-    } catch {
-      setOrderStatus('error');
+    } catch (err) {
+      setOrderStatus('idle');
     }
   };
 
-  if (loading) return (
-    <div className="loader-container">
-      <div className="spinner"></div>
-      <p>يتم الآن تجهيز تجربة تسوق فريدة...</p>
-    </div>
-  );
+  if (loading) return <div className="loader">جاري التحميل...</div>;
 
   return (
-    <div className="storefront" dir="rtl">
-      {/* الهيدر الاحترافي */}
-      <nav className="navbar">
-        <div className="navbar-content">
-          <div className="brand">
-            <div className="brand-logo">
-              {store?.logo_url ? <img src={store.logo_url} alt="logo" /> : <ShoppingBag />}
-            </div>
+    <div className="store-container" dir="rtl">
+      {/* Header */}
+      <nav className="store-nav">
+        <div className="nav-content">
+          <div className="store-info">
+            <img src={store?.logo_url || 'https://via.placeholder.com/50'} className="logo-img" />
             <h1>{store?.name}</h1>
           </div>
-          
-          <button className="cart-trigger" onClick={() => setShowCart(true)}>
-            <div className="cart-icon-wrapper">
-              <ShoppingCart size={22} />
-              {totalItems > 0 && <span className="badge">{totalItems}</span>}
-            </div>
-            <span className="cart-text">السلة</span>
+          <button className="cart-btn" onClick={() => setShowCart(true)}>
+            <Icons.Cart />
+            {totalItems > 0 && <span className="cart-badge">{totalItems}</span>}
           </button>
         </div>
       </nav>
 
-      {/* المحتوى الرئيسي */}
-      <main className="main-container">
-        <header className="hero-section">
-          <h2>{store?.description || 'أهلاً بك في متجرنا'}</h2>
-          <div className="divider"></div>
-        </header>
+      {/* Hero */}
+      <header className="store-hero">
+        <p>{store?.description}</p>
+      </header>
 
-        <div className="products-grid">
-          {store?.products?.map((product: Product) => (
-            <div key={product.id} className="product-card shadow-animation">
-              <div className="image-wrapper">
-                <img src={product.image_url || 'https://via.placeholder.com/400'} alt={product.name} />
-                {product.availableQuantity! <= 0 && <span className="preorder-tag">حجز مسبق</span>}
-              </div>
-              <div className="product-details">
-                <h3>{product.name}</h3>
-                <div className="price-tag">{product.price} <span>ر.س</span></div>
-                <button 
-                  className="add-button" 
-                  onClick={() => addToCart(product)}
-                >
-                  <Plus size={18} /> إضافة للسلة
+      {/* Grid */}
+      <div className="product-grid">
+        {store?.products?.map((p: any) => (
+          <div key={p.id} className="p-card">
+            <div className="p-img-box">
+               <img src={p.image_url} alt={p.name} />
+            </div>
+            <div className="p-info">
+              <h3>{p.name}</h3>
+              <div className="p-footer">
+                <span className="p-price">{p.price} ر.س</span>
+                <button onClick={() => addToCart(p)} className="add-btn">
+                   <Icons.Plus /> إضافة
                 </button>
               </div>
             </div>
-          ))}
-        </div>
-      </main>
+          </div>
+        ))}
+      </div>
 
-      {/* سلة المشتريات الجانبية */}
+      {/* Cart Drawer */}
       {showCart && (
-        <div className="cart-overlay">
-          <div className="cart-backdrop" onClick={() => setShowCart(false)}></div>
-          <div className="cart-panel">
-            <div className="cart-panel-header">
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="text-blue-600" />
-                <h3>حقيبة التسوق</h3>
-              </div>
-              <button className="close-btn" onClick={() => setShowCart(false)}><X /></button>
+        <div className="drawer-overlay">
+          <div className="drawer-content">
+            <div className="drawer-header">
+              <h2>سلة المشتريات</h2>
+              <button onClick={() => setShowCart(false)}><Icons.X /></button>
             </div>
 
-            <div className="cart-content">
-              {cart.length === 0 ? (
-                <div className="empty-state">
-                  <ShoppingBag size={60} strokeWidth={1} />
-                  <p>ابدأ بإضافة المنتجات التي تحبها</p>
+            <div className="cart-list">
+              {cart.map(item => (
+                <div key={item.id} className="cart-item">
+                  <img src={item.image_url} width="60" />
+                  <div className="item-meta">
+                    <h4>{item.name}</h4>
+                    <div className="qty-row">
+                       <button onClick={() => updateQty(item.id, -1)}><Icons.Minus /></button>
+                       <span>{item.cartQuantity}</span>
+                       <button onClick={() => updateQty(item.id, 1)}><Icons.Plus /></button>
+                    </div>
+                  </div>
+                  <button className="del-btn" onClick={() => setCart(c => c.filter(i => i.id !== item.id))}>
+                    <Icons.Trash />
+                  </button>
                 </div>
-              ) : (
-                <>
-                  <div className="cart-items-list">
-                    {cart.map(item => (
-                      <div key={item.id} className="cart-item-card">
-                        <img src={item.image_url} alt={item.name} />
-                        <div className="item-info">
-                          <h4>{item.name}</h4>
-                          <p className="item-price">{item.price} ر.س</p>
-                          <div className="quantity-controls">
-                            <button onClick={() => updateQuantity(item.id, -1)}><Minus size={14}/></button>
-                            <span>{item.cartQuantity}</span>
-                            <button onClick={() => updateQuantity(item.id, 1)}><Plus size={14}/></button>
-                          </div>
-                        </div>
-                        <button className="delete-btn" onClick={() => removeItem(item.id)}><Trash2 size={18}/></button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="checkout-section">
-                    <div className="total-box">
-                      <span>الإجمالي</span>
-                      <span className="total-amount">{totalPrice} ر.س</span>
-                    </div>
-
-                    <div className="form-group">
-                      <div className="input-with-icon">
-                        <User size={18} />
-                        <input placeholder="الاسم الكامل" value={customerName} onChange={e => setCustomerName(e.target.value)} />
-                      </div>
-                      <div className="input-with-icon">
-                        <Phone size={18} />
-                        <input placeholder="رقم الجوال" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
-                      </div>
-                    </div>
-
-                    {orderStatus === 'success' ? (
-                      <a href={whatsappLink} target="_blank" className="whatsapp-btn">
-                        <MessageSquare size={20} /> تأكيد عبر واتساب
-                      </a>
-                    ) : (
-                      <button 
-                        className="final-checkout-btn"
-                        onClick={handleSubmitOrder}
-                        disabled={orderStatus === 'submitting'}
-                      >
-                        {orderStatus === 'submitting' ? 'جاري الإرسال...' : 'إتمام الطلب الآن'}
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
+              ))}
             </div>
+
+            {cart.length > 0 && (
+              <div className="checkout-form">
+                <div className="total-row">
+                  <span>الإجمالي:</span>
+                  <strong>{totalPrice} ريال</strong>
+                </div>
+                <input placeholder="الاسم" onChange={e => setCustomer({...customer, name: e.target.value})} />
+                <input placeholder="رقم الجوال" onChange={e => setCustomer({...customer, phone: e.target.value})} />
+                <button onClick={submitOrder} disabled={orderStatus === 'sending'} className="order-btn">
+                  {orderStatus === 'success' ? 'تم الطلب ✅' : 'إتمام الطلب'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
