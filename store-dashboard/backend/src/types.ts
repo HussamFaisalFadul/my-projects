@@ -1,3 +1,5 @@
+import { Pool } from 'pg';
+
 export interface User {
   id: string;
   name: string;
@@ -9,10 +11,11 @@ export interface User {
 export interface Store {
   id: string;
   name: string;
-  slug: string;          // ← تمت الإضافة
+  slug: string;
   description?: string;
   logoUrl?: string;
   ownerId: string;
+  ownerPhone?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,7 +42,6 @@ export interface Invitation {
   createdAt: Date;
 }
 
-// ===== صور المنتج =====
 export interface ProductImage {
   id: string;
   productId: string;
@@ -49,7 +51,6 @@ export interface ProductImage {
   createdAt: Date;
 }
 
-// ===== متغيرات المنتج =====
 export interface ProductVariant {
   id: string;
   productId: string;
@@ -65,7 +66,6 @@ export interface ProductVariant {
   createdAt: Date;
 }
 
-// ===== حركة المخزون =====
 export interface StockMovement {
   id: string;
   productId: string;
@@ -81,14 +81,13 @@ export interface StockMovement {
   createdAt: Date;
 }
 
-// ===== المنتج الكامل =====
 export interface Product {
   id: string;
   storeId: string;
   name: string;
   price: number;
   quantity: number;
-  reservedQuantity?: number;   // ← تمت الإضافة (الكمية المحجوزة)
+  reservedQuantity: number;
   category: string;
   minQuantity: number;
   imageUrl?: string;
@@ -105,6 +104,9 @@ export interface Product {
   unit?: string;
   isActive?: boolean;
   tags?: string[];
+  status?: string;
+  discountType?: string;
+  discountValue?: number;
   images?: ProductImage[];
   variants?: ProductVariant[];
   stockMovements?: StockMovement[];
@@ -117,7 +119,7 @@ export interface Order {
   storeId: string;
   customerName: string;
   customerPhone: string;
-  source: 'واتساب' | 'انستغرام' | 'مباشر';
+  source: 'واتساب' | 'انستغرام' | 'مباشر' | 'متجر إلكتروني';
   items: OrderItem[];
   totalPrice: number;
   status: 'جديد' | 'قيد التنفيذ' | 'مكتمل' | 'ملغي';
@@ -131,6 +133,7 @@ export interface OrderItem {
   productName: string;
   quantity: number;
   price: number;
+  isReservation?: boolean;
 }
 
 export interface StoreStats {
@@ -168,3 +171,20 @@ export interface ClientToServerEvents {
   join_store: (storeId: string) => void;
   leave_store: (storeId: string) => void;
 }
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 10,
+  idleTimeoutMillis: 30000,
+});
+
+pool.on('connect', () => {
+  console.log('✅ متصل بقاعدة البيانات PostgreSQL');
+});
+
+pool.on('error', (err) => {
+  console.error('❌ خطأ في قاعدة البيانات:', err.message);
+});
+
+export default pool;
