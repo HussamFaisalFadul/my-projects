@@ -1,568 +1,388 @@
-// src/pages/Products.tsx
+import React from 'react';
 import { useProductsLogic } from './useProductsLogic';
 import BarcodeScanner from '../BarcodeScanner';
-import './Products.css';
+import ProductWizard from './ProductWizard';
+
+const STYLES = `
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
+.pp-root{min-height:100vh;background:#f0f2f7;font-family:'Tajawal',sans-serif;padding:28px 24px;box-sizing:border-box;}
+.pp-hero{background:linear-gradient(135deg,#0a1628 0%,#112240 50%,#1a3a6b 100%);border-radius:20px;padding:32px 36px;display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;position:relative;overflow:hidden;}
+.pp-hero::before{content:'';position:absolute;top:-60px;left:-60px;width:220px;height:220px;background:radial-gradient(circle,rgba(99,163,255,0.12) 0%,transparent 70%);pointer-events:none;}
+.pp-hero::after{content:'📦';position:absolute;left:36px;bottom:-10px;font-size:90px;opacity:0.06;pointer-events:none;}
+.pp-eyebrow{font-size:11px;font-weight:700;letter-spacing:2.5px;color:#63a3ff;text-transform:uppercase;margin:0 0 6px;}
+.pp-hero-text h1{font-size:26px;font-weight:900;color:#fff;margin:0 0 6px;}
+.pp-hero-text p{font-size:13px;color:rgba(255,255,255,0.55);margin:0;}
+.pp-hero-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.pp-btn-mode,.pp-btn-view,.pp-btn-export{padding:9px 16px;border-radius:30px;border:1.5px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:#cde;font-size:12.5px;font-weight:600;cursor:pointer;font-family:'Tajawal',sans-serif;transition:all 0.2s;}
+.pp-btn-mode:hover,.pp-btn-view:hover,.pp-btn-export:hover{background:rgba(255,255,255,0.16);}
+.pp-btn-add{padding:10px 22px;border-radius:30px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;box-shadow:0 4px 16px rgba(37,99,235,0.45);transition:all 0.2s;white-space:nowrap;}
+.pp-btn-add:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(37,99,235,0.55);}
+.pp-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px;}
+@media(max-width:900px){.pp-stats{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:600px){.pp-stats{grid-template-columns:repeat(2,1fr);}}
+.pp-stat{background:#fff;border-radius:14px;padding:18px 20px;border:1px solid #e8ecf4;position:relative;overflow:hidden;transition:transform 0.2s,box-shadow 0.2s;}
+.pp-stat:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.08);}
+.pp-stat::before{content:'';position:absolute;top:0;right:0;width:4px;height:100%;background:#e0e7ff;border-radius:0 14px 14px 0;}
+.pp-stat.warn::before{background:linear-gradient(180deg,#f97316,#ea580c);}
+.pp-stat-label{font-size:11.5px;color:#8896b3;margin-bottom:6px;display:block;font-weight:500;}
+.pp-stat-val{font-size:26px;font-weight:900;color:#111827;line-height:1;}
+.pp-stat.warn .pp-stat-val{color:#ea580c;}
+.pp-stat-icon{position:absolute;top:14px;left:16px;font-size:22px;opacity:0.2;}
+.pp-filters{background:#fff;border-radius:14px;padding:16px 20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px;border:1px solid #e8ecf4;box-shadow:0 2px 8px rgba(0,0,0,0.04);}
+.pp-search{flex:1;min-width:200px;padding:9px 14px;border:1.5px solid #e0e7ff;border-radius:10px;font-size:13.5px;font-family:'Tajawal',sans-serif;background:#f8faff;color:#1e293b;outline:none;transition:border 0.2s;}
+.pp-search:focus{border-color:#2563eb;background:#fff;}
+.pp-select{padding:9px 12px;border:1.5px solid #e0e7ff;border-radius:10px;font-size:13px;font-family:'Tajawal',sans-serif;background:#f8faff;color:#374151;outline:none;cursor:pointer;}
+.pp-btn-low{padding:9px 14px;border-radius:10px;border:1.5px solid #fed7aa;background:#fff7ed;color:#c2410c;font-size:12.5px;font-weight:700;cursor:pointer;font-family:'Tajawal',sans-serif;white-space:nowrap;transition:all 0.2s;}
+.pp-btn-low.active{background:#c2410c;color:#fff;border-color:#c2410c;}
+.pp-loading{text-align:center;padding:80px 20px;color:#6b7280;font-size:15px;font-family:'Tajawal',sans-serif;}
+.pp-spinner{width:36px;height:36px;border:3px solid #e0e7ff;border-top-color:#2563eb;border-radius:50%;animation:pp-spin 0.7s linear infinite;margin:0 auto 16px;}
+@keyframes pp-spin{to{transform:rotate(360deg);}}
+.pp-empty{text-align:center;padding:80px 20px;background:#fff;border-radius:16px;border:1px solid #e8ecf4;}
+.pp-empty-icon{font-size:52px;margin-bottom:12px;}
+.pp-empty h3{font-size:18px;font-weight:700;color:#1e293b;margin:0 0 6px;font-family:'Tajawal',sans-serif;}
+.pp-empty p{font-size:13px;color:#94a3b8;margin:0;font-family:'Tajawal',sans-serif;}
+.pp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px;}
+.pp-card{background:#fff;border-radius:16px;border:1.5px solid #e8ecf4;overflow:hidden;transition:transform 0.2s,box-shadow 0.2s;display:flex;flex-direction:column;}
+.pp-card:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(0,0,0,0.1);}
+.pp-card.low-stock{border-color:#fed7aa;}
+.pp-card.inactive{opacity:0.6;}
+.pp-card-media{position:relative;aspect-ratio:4/3;background:linear-gradient(135deg,#f0f4ff,#e8ecf8);overflow:hidden;}
+.pp-card-media img{width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.3s;}
+.pp-card:hover .pp-card-media img{transform:scale(1.04);}
+.pp-no-img{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:900;color:#93a8d4;background:linear-gradient(135deg,#eef2ff,#e0e7ff);font-family:'Tajawal',sans-serif;}
+.pp-card-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,0.55) 0%,transparent 50%);opacity:0;transition:opacity 0.25s;display:flex;align-items:flex-end;justify-content:flex-end;padding:10px;gap:6px;}
+.pp-card:hover .pp-card-overlay{opacity:1;}
+.pp-overlay-action{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,0.9);border:none;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;}
+.pp-img-count{position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.65);color:#fff;font-size:10px;padding:2px 7px;border-radius:20px;font-family:'Tajawal',sans-serif;}
+.pp-variant-count{position:absolute;top:8px;left:8px;background:#2563eb;color:#fff;font-size:10px;padding:2px 7px;border-radius:20px;font-family:'Tajawal',sans-serif;}
+.pp-low-badge{position:absolute;bottom:8px;right:8px;background:#ea580c;color:#fff;font-size:10px;padding:2px 8px;border-radius:20px;font-family:'Tajawal',sans-serif;font-weight:700;}
+.pp-card-body{padding:14px 16px;flex:1;}
+.pp-card-badges{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;}
+.pp-pill{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;font-family:'Tajawal',sans-serif;}
+.pp-pill-green{background:#dcfce7;color:#15803d;}
+.pp-pill-gray{background:#f1f5f9;color:#64748b;}
+.pp-pill-red{background:#fef2f2;color:#dc2626;}
+.pp-card-name{font-size:15px;font-weight:800;color:#111827;margin:0 0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'Tajawal',sans-serif;}
+.pp-card-cat{font-size:12px;color:#94a3b8;margin:0 0 10px;font-family:'Tajawal',sans-serif;}
+.pp-price-row{margin-bottom:10px;display:flex;align-items:baseline;gap:7px;}
+.pp-price-main{font-size:17px;font-weight:900;color:#1e293b;font-family:'Tajawal',sans-serif;}
+.pp-price-old{font-size:12px;color:#94a3b8;text-decoration:line-through;font-family:'Tajawal',sans-serif;}
+.pp-price-range{font-size:13px;font-weight:700;color:#2563eb;font-family:'Tajawal',sans-serif;}
+.pp-price-sale{font-size:17px;font-weight:900;color:#dc2626;font-family:'Tajawal',sans-serif;}
+.pp-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.pp-meta-item{background:#f8faff;border-radius:8px;padding:6px 8px;}
+.pp-meta-item span{display:block;font-size:10px;color:#94a3b8;font-family:'Tajawal',sans-serif;}
+.pp-meta-item strong{font-size:13px;font-weight:700;color:#374151;font-family:'Tajawal',sans-serif;}
+.pp-card-footer{padding:10px 16px 14px;display:flex;gap:6px;border-top:1px solid #f1f5f9;}
+.pp-act-edit{flex:1;padding:8px;background:#eff6ff;color:#1d4ed8;border:none;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:700;font-family:'Tajawal',sans-serif;transition:background 0.2s;}
+.pp-act-edit:hover{background:#dbeafe;}
+.pp-act-log{padding:8px 10px;background:#f8faff;color:#64748b;border:none;border-radius:8px;cursor:pointer;font-size:12.5px;font-family:'Tajawal',sans-serif;}
+.pp-act-del{padding:8px 10px;background:#fef2f2;color:#dc2626;border:none;border-radius:8px;cursor:pointer;font-size:12.5px;font-family:'Tajawal',sans-serif;}
+.pp-table-wrap{background:#fff;border-radius:16px;border:1px solid #e8ecf4;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.05);}
+.pp-table{width:100%;border-collapse:collapse;}
+.pp-table thead tr{background:linear-gradient(135deg,#f0f4ff,#e8ecf8);}
+.pp-table th{padding:13px 16px;text-align:right;font-size:12px;font-weight:700;color:#4b5563;font-family:'Tajawal',sans-serif;border-bottom:1px solid #e0e7ff;white-space:nowrap;}
+.pp-table td{padding:12px 16px;font-size:13.5px;color:#374151;font-family:'Tajawal',sans-serif;border-bottom:1px solid #f3f4f6;vertical-align:middle;}
+.pp-table tr:last-child td{border-bottom:none;}
+.pp-table tr:hover td{background:#f8faff;}
+.pp-table-name{font-weight:700;color:#111827;display:flex;align-items:center;gap:10px;}
+.pp-table-thumb{width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0;}
+.pp-table-initials{width:38px;height:38px;border-radius:8px;flex-shrink:0;background:linear-gradient(135deg,#e0e7ff,#c7d2fe);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;color:#4f46e5;font-family:'Tajawal',sans-serif;}
+.pp-table-actions{display:flex;gap:6px;}
+.pp-tbl-edit{padding:6px 12px;background:#eff6ff;color:#1d4ed8;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-family:'Tajawal',sans-serif;font-weight:700;}
+.pp-tbl-del{padding:6px 12px;background:#fef2f2;color:#dc2626;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-family:'Tajawal',sans-serif;font-weight:700;}
+.pp-modal-bg{position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:20px;}
+.pp-modal{background:#fff;border-radius:18px;width:100%;max-width:520px;padding:28px;box-shadow:0 24px 64px rgba(0,0,0,0.18);font-family:'Tajawal',sans-serif;}
+.pp-modal h3{margin:0 0 20px;font-size:17px;font-weight:800;color:#111827;}
+.pp-modal-form{display:flex;flex-direction:column;gap:14px;}
+.pp-modal-label{font-size:12.5px;font-weight:600;color:#374151;margin-bottom:5px;display:block;}
+.pp-modal-select,.pp-modal-input,.pp-modal-textarea{width:100%;padding:9px 12px;border:1.5px solid #e0e7ff;border-radius:9px;font-family:'Tajawal',sans-serif;font-size:13.5px;color:#111827;background:#f8faff;outline:none;box-sizing:border-box;}
+.pp-modal-select:focus,.pp-modal-input:focus,.pp-modal-textarea:focus{border-color:#2563eb;}
+.pp-modal-history{max-height:220px;overflow-y:auto;margin-top:4px;}
+.pp-mov-row{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:9px;margin-bottom:5px;background:#f8faff;font-size:12.5px;gap:8px;}
+.pp-mov-type{font-weight:700;}
+.pp-mov-qty{font-weight:900;}
+.pp-mov-qty.pos{color:#16a34a;}
+.pp-mov-qty.neg{color:#dc2626;}
+.pp-modal-actions{display:flex;gap:10px;margin-top:8px;}
+.pp-modal-save{flex:1;padding:11px;background:linear-gradient(135deg,#1d4ed8,#1e40af);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:700;font-family:'Tajawal',sans-serif;}
+.pp-modal-cancel{padding:11px 18px;background:#f1f5f9;color:#64748b;border:none;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;font-family:'Tajawal',sans-serif;}
+`;
 
 export default function Products() {
   const {
-    mode, viewMode, sortMode, products, loading, showForm, editingId, form, saving, uploadingImages, showScanner,
-    search, filterCategory, filterLowStock, filterActive, activeTab, selectedProductForLog, showMovementModal,
-    movementReason, movementQuantity, movementNote, movementsData, suppliers,
-    categories, filteredProducts, lowStockCount, activeCount, imageCount, totalValue,
-    toggleMode, toggleViewMode, changeSort, openAddForm, handleEdit, addImageFromUrl, addImagesFromFiles,
-    removeImage, setPrimaryImage, moveImage, addVariant, updateVariant, updateVariantAttribute,
-    addVariantAttributeKey, removeVariant, handleSubmit, handleDelete, handleQuantityChange, showStockLog,
-    addStockMovement, onDropFileInput, productBadge, getMainImage, setForm, setSearch, setFilterCategory,
-    setFilterLowStock, setFilterActive, setActiveTab, setShowForm, setShowScanner, setMovementReason,
-    setMovementQuantity, setMovementNote, setSelectedProductForLog, setShowMovementModal,
-    t, formatMoney, formatDate, getInitials, toNumber, generateEAN13, syncPrimaryImage,
+    mode, viewMode, sortMode, products, loading, showForm, editingId,
+    showScanner, search, filterCategory, filterLowStock, filterActive,
+    selectedProductForLog, showMovementModal, movementReason, movementQuantity,
+    movementNote, movementsData, suppliers, categories, filteredProducts,
+    lowStockCount, activeCount, imageCount, totalValue,
+    toggleMode, toggleViewMode, changeSort, openAddForm, handleEdit,
+    handleDelete, showStockLog, addStockMovement, handleSubmitDirect,
+    getMainImage, setSearch, setFilterCategory, setFilterLowStock,
+    setFilterActive, setShowForm, setShowScanner, setMovementReason,
+    setMovementQuantity, setMovementNote, setSelectedProductForLog,
+    setShowMovementModal, getInitials,
+    t, formatMoney, formatDate, exportToExcel,
   } = useProductsLogic();
 
+  const movTypeLabel: Record<string, string> = {
+    purchase: 'شراء', sale: 'بيع', return: 'إرجاع', adjustment: 'تسوية', damage: 'تلف',
+  };
+
   return (
-    <div className="products-page" dir="rtl">
-      {showScanner && (
-        <BarcodeScanner
-          onDetected={(code) => { setForm(prev => ({ ...prev, barcode: code })); setShowScanner(false); }}
-          onClose={() => setShowScanner(false)}
-        />
-      )}
+    <>
+      <style>{STYLES}</style>
+      <div className="pp-root" dir="rtl">
 
-      <div className="hero-card">
-        <div>
-          <p className="eyebrow">{t('products.management')}</p>
-          <h1 className="page-title">{t('products.title')}</h1>
-          <p className="subtitle">{t('products.subtitle')}</p>
-        </div>
-        <div className="hero-actions">
-          <button className={`mode-toggle ${mode}`} onClick={toggleMode} type="button">
-            {mode === 'simple' ? `⚡ ${t('products.simple')}` : `🧠 ${t('products.advanced')}`}
-          </button>
-          <button className="view-toggle" onClick={toggleViewMode} type="button">
-            {viewMode === 'grid' ? `☷ ${t('products.table')}` : `▣ ${t('products.grid')}`}
-          </button>
-          <button className="btn-add" onClick={openAddForm} type="button">+ {t('products.addProduct')}</button>
-        </div>
-      </div>
+        {showScanner && (
+          <BarcodeScanner
+            onDetected={(code: string) => { setShowScanner(false); }}
+            onClose={() => setShowScanner(false)}
+          />
+        )}
 
-      <div className="stats-grid">
-        <div className="stat-card"><span>{t('products.totalProducts')}</span><strong>{products.length}</strong></div>
-        <div className="stat-card"><span>{t('products.activeCount')}</span><strong>{activeCount}</strong></div>
-        <div className="stat-card warning"><span>{t('products.lowStockCount')}</span><strong>{lowStockCount}</strong></div>
-        <div className="stat-card"><span>{t('products.withImages')}</span><strong>{imageCount}</strong></div>
-        <div className="stat-card"><span>{t('products.totalValue')}</span><strong>{formatMoney(totalValue, t)}</strong></div>
-      </div>
-
-      <div className="filters-panel">
-        <input
-          className="search-input"
-          placeholder={t('products.searchPlaceholder')}
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        <select className="filter-select" value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
-          <option value="">{t('products.allCategories')}</option>
-          {categories.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select className="filter-select" value={filterActive} onChange={e => setFilterActive(e.target.value as any)}>
-          <option value="all">{t('products.allStatus')}</option>
-          <option value="active">{t('products.active')}</option>
-          <option value="inactive">{t('products.inactive')}</option>
-        </select>
-        <select className="filter-select" value={sortMode} onChange={e => changeSort(e.target.value as SortMode)}>
-          <option value="newest">{t('products.sortNewest')}</option>
-          <option value="name">{t('products.sortName')}</option>
-          <option value="price_asc">{t('products.sortPriceAsc')}</option>
-          <option value="price_desc">{t('products.sortPriceDesc')}</option>
-          <option value="stock_asc">{t('products.sortStockAsc')}</option>
-          <option value="stock_desc">{t('products.sortStockDesc')}</option>
-        </select>
-        <button className={`filter-low-btn ${filterLowStock ? 'active' : ''}`} onClick={() => setFilterLowStock(v => !v)} type="button">
-          {filterLowStock ? '✅' : '⚠️'} {t('products.lowStockFilter')}
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="loading-box">{t('common.loading')}</div>
-      ) : filteredProducts.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">📦</div>
-          <h3>{t('products.noProductsMatch')}</h3>
-          <p>{t('products.noProductsMatchDesc')}</p>
+        <div className="pp-hero">
+          <div className="pp-hero-text">
+            <p className="pp-eyebrow">إدارة المخزون</p>
+            <h1>{t('products.title')}</h1>
+            <p>{t('products.subtitle')}</p>
+          </div>
+          <div className="pp-hero-actions">
+            <button className="pp-btn-mode" onClick={toggleMode} type="button">{mode === 'simple' ? '⚡ بسيط' : '🧠 متقدم'}</button>
+            <button className="pp-btn-view" onClick={toggleViewMode} type="button">{viewMode === 'grid' ? '☷ جدول' : '▣ بطاقات'}</button>
+            <button className="pp-btn-export" onClick={exportToExcel} type="button">📊 Excel</button>
+            <button className="pp-btn-add" onClick={openAddForm} type="button">+ {t('products.addProduct')}</button>
+          </div>
         </div>
-      ) : viewMode === 'grid' ? (
-        <div className="products-grid">
-          {filteredProducts.map(p => {
-            const isLow = (p.quantity || 0) <= (p.minQuantity ?? 5);
-            const mainImage = getMainImage(p);
-            const imagesCount = (p.images || []).length;
-            const hasSale = (p.salePrice || 0) > 0 && (p.salePrice || 0) < (p.price || 0);
-            return (
-              <article key={p.id} className={`product-card ${isLow ? 'low' : ''} ${p.isActive === false ? 'inactive' : ''}`}>
-                <div className="card-media">
-                  {mainImage ? <img src={mainImage} alt={p.name} /> : <div className="no-image">{getInitials(p.name || 'P')}</div>}
-                  <div className="media-overlay">
-                    {imagesCount > 1 && <span className="overlay-badge">+{imagesCount - 1} {t('products.images')}</span>}
-                    <div className="quick-actions">
-                      <button type="button" onClick={() => handleEdit(p)}>✏️</button>
-                      <button type="button" onClick={() => showStockLog(p)}>📋</button>
-                    </div>
-                  </div>
-                </div>
-                <div className="card-body">
-                  {productBadge(p)}
-                  <h3 title={p.name}>{p.name}</h3>
-                  <p className="card-subtitle">{p.category || t('products.noCategory')}</p>
-                  <div className="price-row">
-                    {hasSale ? (
-                      <><strong className="sale-price">{formatMoney(p.salePrice, t)}</strong><span className="old-price">{formatMoney(p.price, t)}</span></>
-                    ) : (
-                      <strong>{formatMoney(p.price, t)}</strong>
-                    )}
-                  </div>
-                  <div className="meta-grid">
-                    <div><span>{t('products.stock')}</span><strong>{p.quantity || 0}</strong></div>
-                    <div><span>{t('products.minQuantity')}</span><strong>{p.minQuantity ?? 5}</strong></div>
-                    <div><span>{t('products.sku')}</span><strong>{p.sku || '—'}</strong></div>
-                    <div><span>{t('products.barcode')}</span><strong>{p.barcode || '—'}</strong></div>
-                  </div>
-                  {mode === 'advanced' && (
-                    <div className="extra-lines">
-                      <div><span>{t('products.brand')}</span><strong>{p.brand || '—'}</strong></div>
-                      <div><span>{t('products.costPrice')}</span><strong>{formatMoney(p.costPrice, t)}</strong></div>
-                      <div><span>{t('products.taxRate')}</span><strong>{p.taxRate ? `${p.taxRate}%` : '—'}</strong></div>
-                    </div>
-                  )}
-                </div>
-                <div className="card-footer">
-                  <div className="qty-control">
-                    <button type="button" onClick={() => handleQuantityChange(p, -1)}>−</button>
-                    <span className={`qty-badge ${isLow ? 'qty-low' : 'qty-ok'}`}>{p.quantity || 0}</span>
-                    <button type="button" onClick={() => handleQuantityChange(p, 1)}>+</button>
-                  </div>
-                  <div className="action-row">
-                    <button className="btn-secondary" type="button" onClick={() => handleEdit(p)}>{t('common.edit')}</button>
-                    <button className="btn-ghost" type="button" onClick={() => showStockLog(p)}>{t('products.log')}</button>
-                    <button className="btn-danger" type="button" onClick={() => handleDelete(p.id)}>{t('common.delete')}</button>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="table-shell">
-          <table className="products-table">
-            <thead>
-              <tr>
-                <th>{t('products.product')}</th>
-                <th>{t('products.price')}</th>
-                <th>{t('products.stock')}</th>
-                <th>{t('products.category')}</th>
-                <th>{t('products.status')}</th>
-                {mode === 'advanced' && <th>{t('products.sku')}</th>}
-                {mode === 'advanced' && <th>{t('products.barcode')}</th>}
-                <th>{t('products.actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProducts.map(p => {
-                const isLow = (p.quantity || 0) <= (p.minQuantity ?? 5);
-                const image = getMainImage(p);
-                return (
-                  <tr key={p.id} className={isLow ? 'row-low-stock' : ''}>
-                    <td>
-                      <div className="product-name-cell">
-                        {image ? <img src={image} alt={p.name} className="product-thumb" /> : <div className="thumb-fallback">{getInitials(p.name || 'P')}</div>}
-                        <div>
-                          <strong>{p.name}</strong>
-                          {mode === 'advanced' && <div className="muted">{p.brand || '—'}</div>}
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      {((p.salePrice || 0) > 0 && (p.salePrice || 0) < (p.price || 0)) ? (
-                        <div className="price-compact">
-                          <strong className="sale-price">{formatMoney(p.salePrice, t)}</strong>
-                          <span className="old-price">{formatMoney(p.price, t)}</span>
-                        </div>
-                      ) : (
-                        <strong>{formatMoney(p.price, t)}</strong>
-                      )}
-                    </td>
-                    <td>
-                      <div className="quantity-control">
-                        <button onClick={() => handleQuantityChange(p, -1)} type="button">−</button>
-                        <span className={`qty-badge ${isLow ? 'qty-low' : 'qty-ok'}`}>{p.quantity || 0}</span>
-                        <button onClick={() => handleQuantityChange(p, 1)} type="button">+</button>
-                      </div>
-                    </td>
-                    <td>{p.category || '—'}</td>
-                    <td>{p.isActive === false ? t('products.inactive') : t('products.active')}</td>
-                    {mode === 'advanced' && <td>{p.sku || '—'}</td>}
-                    {mode === 'advanced' && <td>{p.barcode || '—'}</td>}
-                    <td>
-                      <div className="action-btns">
-                        <button className="btn-edit" onClick={() => handleEdit(p)} type="button">{t('common.edit')}</button>
-                        <button className="btn-log" onClick={() => showStockLog(p)} type="button">{t('products.log')}</button>
-                        <button className="btn-delete" onClick={() => handleDelete(p.id)} type="button">{t('common.delete')}</button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
 
-      {/* Modal for stock movements */}
-      {showMovementModal && selectedProductForLog && (
-        <div className="modal-overlay" onClick={() => setShowMovementModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <p className="modal-kicker">{t('products.stockMovements')}</p>
-                <h2>{selectedProductForLog.name}</h2>
-              </div>
-              <button className="modal-close" onClick={() => setShowMovementModal(false)} type="button">✕</button>
+        <div className="pp-stats">
+          {[
+            { icon: '🗂️', label: 'إجمالي المنتجات', val: products.length, warn: false, small: false },
+            { icon: '✅', label: 'المنتجات النشطة', val: activeCount, warn: false, small: false },
+            { icon: '⚠️', label: 'مخزون منخفض',    val: lowStockCount, warn: true,  small: false },
+            { icon: '🖼️', label: 'مع صور',           val: imageCount,   warn: false, small: false },
+            { icon: '💰', label: 'إجمالي القيمة',   val: formatMoney(totalValue, t), warn: false, small: true },
+          ].map((s, i) => (
+            <div key={i} className={`pp-stat ${s.warn ? 'warn' : ''}`}>
+              <span className="pp-stat-icon">{s.icon}</span>
+              <span className="pp-stat-label">{s.label}</span>
+              <div className="pp-stat-val" style={s.small ? { fontSize: 15 } : {}}>{s.val}</div>
             </div>
-            <div className="modal-body">
-              <table className="movements-table">
-                <thead>
-                  <tr>
-                    <th>{t('products.date')}</th>
-                    <th>{t('products.change')}</th>
-                    <th>{t('products.before')}</th>
-                    <th>{t('products.after')}</th>
-                    <th>{t('products.type')}</th>
-                    <th>{t('products.note')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {movementsData.length === 0 && (
-                    <tr><td colSpan={6} style={{ textAlign: 'center', color: '#6b7280' }}>{t('products.noMovements')}</td></tr>
-                  )}
-                  {movementsData.map((m: any) => (
-                    <tr key={m.id}>
-                      <td>{formatDate(m.createdAt)}</td>
-                      <td className={m.quantityChange > 0 ? 'positive' : 'negative'}>{m.quantityChange > 0 ? `+${m.quantityChange}` : m.quantityChange}</td>
-                      <td>{m.quantityBefore}</td>
-                      <td>{m.quantityAfter}</td>
-                      <td>{m.type}</td>
-                      <td>{m.note || '—'}</td>
+          ))}
+        </div>
+
+        <div className="pp-filters">
+          <input className="pp-search" placeholder="🔍 بحث بالاسم، SKU، باركود..." value={search} onChange={e => setSearch(e.target.value)} />
+          <select className="pp-select" value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
+            <option value="">كل الفئات</option>
+            {categories.map((c: string) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select className="pp-select" value={filterActive} onChange={e => setFilterActive(e.target.value as any)}>
+            <option value="all">كل الحالات</option>
+            <option value="active">نشط</option>
+            <option value="inactive">موقوف</option>
+          </select>
+          <select className="pp-select" value={sortMode} onChange={e => changeSort(e.target.value as any)}>
+            <option value="newest">الأحدث</option>
+            <option value="name">الاسم</option>
+            <option value="price_asc">السعر ↑</option>
+            <option value="price_desc">السعر ↓</option>
+            <option value="stock_asc">المخزون ↑</option>
+            <option value="stock_desc">المخزون ↓</option>
+          </select>
+          <button className={`pp-btn-low ${filterLowStock ? 'active' : ''}`} onClick={() => setFilterLowStock((v: boolean) => !v)} type="button">
+            {filterLowStock ? '✅' : '⚠️'} مخزون منخفض
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="pp-loading"><div className="pp-spinner" />جارٍ التحميل...</div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="pp-empty">
+            <div className="pp-empty-icon">📦</div>
+            <h3>لا توجد منتجات</h3>
+            <p>جرّب تغيير الفلاتر أو أضف منتجاً جديداً</p>
+          </div>
+        ) : viewMode === 'grid' ? (
+          <div className="pp-grid">
+            {filteredProducts.map((p: any) => {
+              const isLow = (p.quantity || 0) <= (p.minQuantity ?? 5);
+              const mainImage = getMainImage(p);
+              const imagesCount = (p.images || []).length;
+              const hasSale = (p.salePrice || 0) > 0 && (p.salePrice || 0) < (p.price || 0);
+              const hasVariants = (p.variants || []).length > 0;
+              const totalVariantQty = hasVariants
+                ? (p.variants as any[]).reduce((s: number, v: any) => s + (v.quantity || 0), 0) : null;
+              return (
+                <article key={p.id} className={`pp-card ${isLow ? 'low-stock' : ''} ${p.isActive === false ? 'inactive' : ''}`}>
+                  <div className="pp-card-media">
+                    {mainImage ? <img src={mainImage} alt={p.name} /> : <div className="pp-no-img">{getInitials(p.name || 'P')}</div>}
+                    {imagesCount > 1 && <span className="pp-img-count">+{imagesCount - 1}</span>}
+                    {hasVariants && <span className="pp-variant-count">{p.variants.length} متغير</span>}
+                    {isLow && <span className="pp-low-badge">مخزون منخفض</span>}
+                    <div className="pp-card-overlay">
+                      <button className="pp-overlay-action" type="button" onClick={() => handleEdit(p)}>✏️</button>
+                      <button className="pp-overlay-action" type="button" onClick={() => showStockLog(p)}>📋</button>
+                    </div>
+                  </div>
+                  <div className="pp-card-body">
+                    <div className="pp-card-badges">
+                      <span className={`pp-pill ${p.isActive !== false ? 'pp-pill-green' : 'pp-pill-gray'}`}>{p.isActive !== false ? 'نشط' : 'موقوف'}</span>
+                      {hasSale && <span className="pp-pill pp-pill-red">خصم</span>}
+                      {hasVariants && <span className="pp-pill" style={{ background: '#eff6ff', color: '#1d4ed8' }}>متغيرات</span>}
+                    </div>
+                    <h3 className="pp-card-name" title={p.name}>{p.name}</h3>
+                    <p className="pp-card-cat">{p.category || 'بدون فئة'}</p>
+                    <div className="pp-price-row">
+                      {hasVariants ? (
+                        <span className="pp-price-range">{formatMoney(Math.min(...p.variants.map((v: any) => v.price)), t)} – {formatMoney(Math.max(...p.variants.map((v: any) => v.price)), t)}</span>
+                      ) : hasSale ? (
+                        <><span className="pp-price-sale">{formatMoney(p.salePrice, t)}</span><span className="pp-price-old">{formatMoney(p.price, t)}</span></>
+                      ) : (
+                        <span className="pp-price-main">{formatMoney(p.price, t)}</span>
+                      )}
+                    </div>
+                    <div className="pp-meta">
+                      <div className="pp-meta-item"><span>المخزون</span><strong>{hasVariants ? totalVariantQty : (p.quantity || 0)}</strong></div>
+                      <div className="pp-meta-item"><span>الحد الأدنى</span><strong>{p.minQuantity ?? 5}</strong></div>
+                      {p.sku && <div className="pp-meta-item" style={{ gridColumn: '1/-1' }}><span>SKU</span><strong style={{ fontFamily: 'monospace', fontSize: 12 }}>{p.sku}</strong></div>}
+                    </div>
+                  </div>
+                  <div className="pp-card-footer">
+                    <button className="pp-act-edit" onClick={() => handleEdit(p)}>تعديل</button>
+                    <button className="pp-act-log" onClick={() => showStockLog(p)}>📋</button>
+                    <button className="pp-act-del" onClick={() => handleDelete(p.id)}>🗑️</button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="pp-table-wrap">
+            <table className="pp-table">
+              <thead><tr><th>المنتج</th><th>السعر</th><th>المخزون</th><th>المتغيرات</th><th>الفئة</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
+              <tbody>
+                {filteredProducts.map((p: any) => {
+                  const mainImage = getMainImage(p);
+                  const hasVariants = (p.variants || []).length > 0;
+                  const totalQty = hasVariants ? (p.variants as any[]).reduce((s: number, v: any) => s + (v.quantity || 0), 0) : p.quantity || 0;
+                  return (
+                    <tr key={p.id}>
+                      <td><div className="pp-table-name">{mainImage ? <img className="pp-table-thumb" src={mainImage} alt={p.name} /> : <div className="pp-table-initials">{getInitials(p.name || 'P')}</div>}{p.name}</div></td>
+                      <td><strong>{formatMoney(p.price, t)}</strong></td>
+                      <td><span style={{ fontWeight: 700, color: totalQty <= (p.minQuantity ?? 5) ? '#dc2626' : '#374151' }}>{totalQty}</span></td>
+                      <td>{hasVariants ? `${p.variants.length} متغير` : '—'}</td>
+                      <td>{p.category || '—'}</td>
+                      <td><span className={`pp-pill ${p.isActive !== false ? 'pp-pill-green' : 'pp-pill-gray'}`}>{p.isActive !== false ? 'نشط' : 'موقوف'}</span></td>
+                      <td><div className="pp-table-actions"><button className="pp-tbl-edit" onClick={() => handleEdit(p)}>تعديل</button><button className="pp-tbl-del" onClick={() => handleDelete(p.id)}>حذف</button></div></td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="add-movement-form">
-                <h4>{t('products.addMovement')}</h4>
-                <div className="movement-grid">
-                  <input
-                    type="number"
-                    placeholder={t('products.quantityChange')}
-                    value={movementQuantity}
-                    onChange={e => setMovementQuantity(toNumber(e.target.value))}
-                  />
-                  <select value={movementReason} onChange={e => setMovementReason(e.target.value as MovementReason)}>
-                    <option value="purchase">{t('products.purchase')}</option>
-                    <option value="sale">{t('products.sale')}</option>
-                    <option value="return">{t('products.return')}</option>
-                    <option value="adjustment">{t('products.adjustment')}</option>
-                    <option value="damage">{t('products.damage')}</option>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {showMovementModal && selectedProductForLog && (
+          <div className="pp-modal-bg" onClick={() => setShowMovementModal(false)}>
+            <div className="pp-modal" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+              <h3>📦 حركة مخزون — {(selectedProductForLog as any).name}</h3>
+              <div className="pp-modal-form">
+                <div>
+                  <label className="pp-modal-label">نوع الحركة</label>
+                  <select className="pp-modal-select" value={movementReason} onChange={e => setMovementReason(e.target.value as any)}>
+                    <option value="purchase">شراء (إضافة)</option>
+                    <option value="sale">بيع (خصم)</option>
+                    <option value="return">إرجاع</option>
+                    <option value="adjustment">تسوية يدوية</option>
+                    <option value="damage">تلف / هالك</option>
                   </select>
                 </div>
-                <input placeholder={t('products.note')} value={movementNote} onChange={e => setMovementNote(e.target.value)} />
-                <button
-                  type="button"
-                  className="btn-save-inline"
-                  onClick={async () => {
-                    await addStockMovement(selectedProductForLog.id, movementQuantity, movementReason, movementNote);
-                    setMovementQuantity(0);
-                    setMovementNote('');
-                  }}
-                >
-                  {t('products.recordMovement')}
-                </button>
+                <div>
+                  <label className="pp-modal-label">الكمية</label>
+                  <input className="pp-modal-input" type="number" min="1" value={movementQuantity} onChange={e => setMovementQuantity(Number(e.target.value))} />
+                </div>
+                <div>
+                  <label className="pp-modal-label">ملاحظة</label>
+                  <textarea className="pp-modal-textarea" rows={2} value={movementNote} onChange={e => setMovementNote(e.target.value)} placeholder="اختياري..." />
+                </div>
+                {(movementsData as any[]).length > 0 && (
+                  <div>
+                    <label className="pp-modal-label">آخر الحركات</label>
+                    <div className="pp-modal-history">
+                      {(movementsData as any[]).slice(0, 10).map((m: any) => (
+                        <div key={m.id} className="pp-mov-row">
+                          <span className="pp-mov-type">{movTypeLabel[m.type] || m.type}</span>
+                          <span style={{ flex: 1, color: '#64748b' }}>{m.note || '—'}</span>
+                          <span className={`pp-mov-qty ${m.quantityChange > 0 ? 'pos' : 'neg'}`}>{m.quantityChange > 0 ? '+' : ''}{m.quantityChange}</span>
+                          <span style={{ fontSize: 11, color: '#94a3b8' }}>{formatDate(m.createdAt)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="pp-modal-actions">
+                  <button className="pp-modal-save" onClick={() => {
+                    const delta = ['sale', 'damage'].includes(movementReason) ? -Math.abs(movementQuantity) : Math.abs(movementQuantity);
+                    addStockMovement((selectedProductForLog as any).id, delta, movementReason, movementNote);
+                    setShowMovementModal(false);
+                  }}>تسجيل الحركة</button>
+                  <button className="pp-modal-cancel" onClick={() => setShowMovementModal(false)}>إلغاء</button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Modal for add/edit product */}
-      {showForm && (
-        <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="modal large-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header sticky">
-              <div>
-                <p className="modal-kicker">{editingId ? t('products.editProduct') : t('products.newProduct')}</p>
-                <h2>{editingId ? t('products.editProduct') : t('products.createProduct')}</h2>
-              </div>
-              <button className="modal-close" onClick={() => setShowForm(false)} type="button">✕</button>
-            </div>
+        {showForm && (
+          <ProductWizard
+            onClose={() => setShowForm(false)}
+            onSave={async (wizardData: any) => {
+              await handleSubmitDirect({
+                name:        wizardData.name,
+                price:       parseFloat(wizardData.price)       || 0,
+                quantity:    parseInt(wizardData.quantity)      || 0,
+                category:    wizardData.category   || '',
+                minQuantity: parseInt(wizardData.minQuantity)   || 5,
+                barcode:     wizardData.barcode    || '',
+                sku:         wizardData.sku        || '',
+                brand:       wizardData.brand      || '',
+                description: wizardData.description|| '',
+                cost_price:  parseFloat(wizardData.costPrice)   || 0,
+                sale_price:  parseFloat(wizardData.salePrice)   || 0,
+                sale_start:  wizardData.saleStart  || '',
+                sale_end:    wizardData.saleEnd    || '',
+                tax_rate:    parseFloat(wizardData.taxRate)     || 0,
+                weight_kg:   parseFloat(wizardData.weightKg)    || 0,
+                unit:        wizardData.unit       || 'قطعة',
+                is_active:   wizardData.isActive   !== false,
+                tagsText:    wizardData.tags       || '',
+                supplierId:  wizardData.supplierId || '',
+                images: (wizardData.images || []).map((img: any, idx: number) => ({
+                  id: img.id, productId: '', url: img.url,
+                  isPrimary: img.isPrimary, sortOrder: idx,
+                  createdAt: new Date().toISOString(),
+                })),
+                variants: (wizardData.variants || []).map((v: any, idx: number) => ({
+                  id: v.id, productId: '', title: v.title,
+                  attributes: Object.fromEntries((v.attributes || []).map((a: any) => [a.key, a.value])),
+                  price:     parseFloat(v.price)     || 0,
+                  costPrice: parseFloat(v.costPrice) || 0,
+                  quantity:  parseInt(v.quantity)    || 0,
+                  sku: v.sku || undefined, barcode: v.barcode || undefined,
+                  imageUrl: v.imageUrl || undefined,
+                  isActive: v.isActive !== false, sortOrder: idx,
+                })),
+              });
+            }}
+            editingId={editingId}
+            suppliers={suppliers}
+            categories={categories}
+            t={t}
+          />
+        )}
 
-            <div className="modal-tabs">
-              <button className={activeTab === 'basic' ? 'active' : ''} onClick={() => setActiveTab('basic')} type="button">{t('products.basic')}</button>
-              <button className={activeTab === 'media' ? 'active' : ''} onClick={() => setActiveTab('media')} type="button">
-                {t('products.images')} {form.images.length > 0 && `(${form.images.length})`}
-              </button>
-              <button className={activeTab === 'pricing' ? 'active' : ''} onClick={() => setActiveTab('pricing')} type="button">{t('products.pricing')}</button>
-              <button className={activeTab === 'inventory' ? 'active' : ''} onClick={() => setActiveTab('inventory')} type="button">{t('products.inventory')}</button>
-              {mode === 'advanced' && (
-                <button className={activeTab === 'variants' ? 'active' : ''} onClick={() => setActiveTab('variants')} type="button">
-                  {t('products.variants')} {form.variants.length > 0 && `(${form.variants.length})`}
-                </button>
-              )}
-            </div>
-
-            <form className="product-form" onSubmit={e => { e.preventDefault(); handleSubmit(); }}>
-              {/* تبويب الأساسيات */}
-              {activeTab === 'basic' && (
-                <div className="form-section">
-                  <div className="form-grid-2">
-                    <div className="form-row">
-                      <label>{t('products.name')} *</label>
-                      <input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-                    </div>
-                    <div className="form-row">
-                      <label>{t('products.category')}</label>
-                      <input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} />
-                    </div>
-                  </div>
-                  <div className="form-grid-2">
-                    <div className="form-row">
-                      <label>{t('products.barcode')}</label>
-                      <div className="input-with-button">
-                        <input
-                          value={form.barcode}
-                          onChange={e => setForm({ ...form, barcode: e.target.value })}
-                          placeholder={t('products.barcodePlaceholder')}
-                        />
-                        <button type="button" onClick={() => setShowScanner(true)} className="btn-scan">📷</button>
-                        <button type="button" onClick={() => setForm({ ...form, barcode: generateEAN13() })}>{t('products.generate')}</button>
-                      </div>
-                    </div>
-                    <div className="form-row">
-                      <label>{t('products.sku')}</label>
-                      <input value={form.sku} onChange={e => setForm({ ...form, sku: e.target.value })} />
-                    </div>
-                  </div>
-                  <div className="form-grid-2">
-                    <div className="form-row">
-                      <label>{t('products.brand')}</label>
-                      <input value={form.brand} onChange={e => setForm({ ...form, brand: e.target.value })} />
-                    </div>
-                    <div className="form-row">
-                      <label>{t('products.unit')}</label>
-                      <select value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })}>
-                        <option>قطعة</option>
-                        <option>كيلو</option>
-                        <option>لتر</option>
-                        <option>متر</option>
-                        <option>علبة</option>
-                        <option>كرتون</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="form-grid-2">
-                    <div className="form-row">
-                      <label>{t('products.supplier')}</label>
-                      <select value={form.supplierId} onChange={e => setForm({ ...form, supplierId: e.target.value })}>
-                        <option value="">{t('products.noSupplier')}</option>
-                        {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                      </select>
-                    </div>
-                    <div className="form-row form-row-checkbox">
-                      <label>
-                        <input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} />
-                        {t('products.active')}
-                      </label>
-                    </div>
-                  </div>
-                  <div className="form-row">
-                    <label>{t('products.description')}</label>
-                    <textarea rows={4} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-                  </div>
-                  <div className="form-grid-2">
-                    <div className="form-row">
-                      <label>{t('products.tags')}</label>
-                      <input value={form.tagsText} onChange={e => setForm({ ...form, tagsText: e.target.value })} placeholder={t('products.tagsPlaceholder')} />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* تبويب الصور */}
-              {activeTab === 'media' && (
-                <div className="form-section">
-                  <div className="form-grid-2">
-                    <div className="form-row">
-                      <label>{t('products.addImageUrl')}</label>
-                      <div className="input-with-button">
-                        <input id="newImageUrl" type="url" placeholder="https://..." />
-                        <button type="button" onClick={() => {
-                          const input = document.getElementById('newImageUrl') as HTMLInputElement | null;
-                          if (!input || !input.value.trim()) return;
-                          addImageFromUrl(input.value);
-                          input.value = '';
-                        }}>{t('products.add')}</button>
-                      </div>
-                    </div>
-                    <div className="form-row">
-                      <label>{t('products.uploadImages')} {uploadingImages && `⏳ ${t('products.uploading')}`}</label>
-                      <input type="file" multiple accept="image/*" onChange={onDropFileInput} disabled={uploadingImages} />
-                      <small style={{ color: '#6b7280' }}>{t('products.cloudinaryNote')}</small>
-                    </div>
-                  </div>
-                  {uploadingImages && <div className="upload-progress">⏳ {t('products.uploadingCloudinary')}</div>}
-                  <div className="images-grid">
-                    {form.images.map((img, idx) => (
-                      <div key={img.id} className="image-item">
-                        <div className="image-wrap">
-                          <img src={img.url} alt={`${t('products.image')} ${idx + 1}`} />
-                          {img.is_primary && <span className="primary-badge">{t('products.primary')}</span>}
-                        </div>
-                        <div className="image-actions">
-                          <button type="button" onClick={() => setPrimaryImage(idx)} className={img.is_primary ? 'active' : ''} title={t('products.setPrimary')}>⭐</button>
-                          <button type="button" onClick={() => moveImage(idx, idx - 1)} disabled={idx === 0}>⬆️</button>
-                          <button type="button" onClick={() => moveImage(idx, idx + 1)} disabled={idx === form.images.length - 1}>⬇️</button>
-                          <button type="button" onClick={() => removeImage(idx)}>🗑️</button>
-                        </div>
-                      </div>
-                    ))}
-                    {form.images.length === 0 && !uploadingImages && <p className="muted-box">{t('products.noImagesYet')}</p>}
-                  </div>
-                </div>
-              )}
-
-              {/* تبويب الأسعار */}
-              {activeTab === 'pricing' && (
-                <div className="form-section">
-                  <div className="form-grid-2">
-                    <div className="form-row">
-                      <label>{t('products.basePrice')} *</label>
-                      <input type="number" min="0" value={form.price} onChange={e => setForm({ ...form, price: toNumber(e.target.value) })} />
-                    </div>
-                    <div className="form-row">
-                      <label>{t('products.salePrice')}</label>
-                      <input type="number" min="0" value={form.sale_price} onChange={e => setForm({ ...form, sale_price: toNumber(e.target.value) })} />
-                    </div>
-                  </div>
-                  <div className="form-grid-2">
-                    <div className="form-row">
-                      <label>{t('products.costPrice')}</label>
-                      <input type="number" min="0" value={form.cost_price} onChange={e => setForm({ ...form, cost_price: toNumber(e.target.value) })} />
-                    </div>
-                    <div className="form-row">
-                      <label>{t('products.taxRate')} %</label>
-                      <input type="number" min="0" value={form.tax_rate} onChange={e => setForm({ ...form, tax_rate: toNumber(e.target.value) })} />
-                    </div>
-                  </div>
-                  <div className="form-grid-2">
-                    <div className="form-row">
-                      <label>{t('products.saleStart')}</label>
-                      <input type="datetime-local" value={form.sale_start} onChange={e => setForm({ ...form, sale_start: e.target.value })} />
-                    </div>
-                    <div className="form-row">
-                      <label>{t('products.saleEnd')}</label>
-                      <input type="datetime-local" value={form.sale_end} onChange={e => setForm({ ...form, sale_end: e.target.value })} />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* تبويب المخزون */}
-              {activeTab === 'inventory' && (
-                <div className="form-section">
-                  <div className="form-grid-2">
-                    <div className="form-row">
-                      <label>{t('products.currentStock')} *</label>
-                      <input type="number" min="0" value={form.quantity} onChange={e => setForm({ ...form, quantity: toNumber(e.target.value) })} />
-                    </div>
-                    <div className="form-row">
-                      <label>{t('products.minAlert')}</label>
-                      <input type="number" min="0" value={form.minQuantity} onChange={e => setForm({ ...form, minQuantity: toNumber(e.target.value) })} />
-                    </div>
-                  </div>
-                  <div className="form-grid-2">
-                    <div className="form-row">
-                      <label>{t('products.weightKg')}</label>
-                      <input type="number" min="0" step="0.01" value={form.weight_kg} onChange={e => setForm({ ...form, weight_kg: toNumber(e.target.value) })} />
-                    </div>
-                    <div className="form-row">
-                      <label>{t('products.status')}</label>
-                      <select value={String(form.is_active)} onChange={e => setForm({ ...form, is_active: e.target.value === 'true' })}>
-                        <option value="true">{t('products.active')}</option>
-                        <option value="false">{t('products.inactive')}</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* تبويب المتغيرات */}
-              {activeTab === 'variants' && mode === 'advanced' && (
-                <div className="form-section">
-                  <div className="section-head">
-                    <h4>{t('products.variants')}</h4>
-                    <button type="button" onClick={addVariant}>+ {t('products.addVariant')}</button>
-                  </div>
-                  <div className="variants-list">
-                    {form.variants.map((v, idx) => (
-                      <div key={v.id} className="variant-item">
-                        <div className="form-grid-2">
-                          <div className="form-row">
-                            <label>{t('products.variantName')}</label>
-                            <input value={v.title} onChange={e => updateVariant(idx, 'title', e.target.value)} placeholder={t('products.variantPlaceholder')} />
-                          </div>
-                          <div className="form-row">
-                            <label>{t('products.sku')}</label>
-                            <input value={v.sku || ''} onChange={e => updateVariant(idx, 'sku', e.target.value)} />
-                          </div>
-                        </div>
-                        <div className="form-grid-2">
-                          <div className="form-row">
-                            <label>{t('products.price')}</label>
-                            <input type="number" min="0" value={v.price} onChange={e => updateVariant(idx, 'price', toNumber(e.target.value))} />
-                          </div>
-                          <div className="form-row">
-                            <label>{t('products.quantity')}</label>
-                            <input type="number" min="0" value={v.quantity} onChange={e => updateVariant(idx, 'quantity', toNumber(e.target.value))} />
-                          </div>
-                        </div>
-                        <div className="attributes-box">
-                          <div className="attributes-head">
-                            <strong>{t('products.attributes')}</strong>
-                            <button type="button" onClick={() => addVariantAttributeKey(idx)}>+ {t('products.addAttribute')}</button>
-                          </div>
-                          {Object.entries(v.attributes).map(([key, value]) => (
-                            <div className="attribute-row" key={key}>
-                              <input value={key} disabled className="attr-key" />
-                              <input value={value} onChange={e => updateVariantAttribute(idx, key, e.target.value)} placeholder={t('products.value')} />
-                            </div>
-                          ))}
-                          {Object.keys(v.attributes).length === 0 && <p className="muted-box" style={{ margin: 0, fontSize: '13px' }}>{t('products.addAttributeHint')}</p>}
-                        </div>
-                        <div className="variant-actions">
-                          <button type="button" onClick={() => removeVariant(idx)}>{t('common.delete')}</button>
-                        </div>
-                      </div>
-                    ))}
-                    {form.variants.length === 0 && <p className="muted-box">{t('products.noVariantsYet')}</p>}
-                  </div>
-                </div>
-              )}
-
-              <div className="form-actions">
-                <button type="button" className="btn-cancel" onClick={() => setShowForm(false)}>{t('common.cancel')}</button>
-                <button type="submit" className="btn-save" disabled={saving || uploadingImages}>
-                  {uploadingImages ? `⏳ ${t('products.uploadingImages')}` : saving ? t('common.saving') : editingId ? t('common.saveChanges') : t('products.addProduct')}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+      </div>
+    </>
   );
 }

@@ -1,0 +1,101 @@
+/* Wizard CSS (ready to use) */
+.wizard-progress-wrap {
+  padding: 16px 24px 0;
+  border-bottom: 0.5px solid #eee;
+}
+
+.wizard-progress {
+  display: flex;
+  align-items: center;
+  padding-bottom: 16px;
+}
+
+.wp-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 60px;
+}
+
+.wp-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wp-step.active .wp-circle {
+  background: #185FA5;
+  color: #fff;
+}
+
+.wp-step.done .wp-circle {
+  background: #EAF3DE;
+}
+
+.wp-label {
+  font-size: 11px;
+}
+
+.wizard-modal {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+
+.wizard-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 24px;
+}
+
+.wizard-nav {
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 24px;
+}
+
+.wn-back, .wn-next, .wn-save {
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.wn-next {
+  background: #185FA5;
+  color: white;
+}
+
+.wn-save {
+  background: #27500A;
+  color: white;
+}
+
+.type-card, .industry-card {
+  border: 1px solid #ddd;
+  padding: 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.type-card.selected,
+.industry-card.selected {
+  border-color: #185FA5;
+  background: #E6F1FB;
+}
+
+.form-row input, textarea {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 100px);
+  gap: 10px;
+}
