@@ -36,36 +36,6 @@ interface Props {
   onStoreNameChange: (name: string) => void;
 }
 
-const S = `
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
-.sett-root{padding:0;font-family:'IBM Plex Sans Arabic',sans-serif;direction:rtl;}
-.sett-page-title{font-size:20px;font-weight:800;color:#050505;margin-bottom:18px;}
-.sett-card{background:#fff;border-radius:10px;padding:20px 22px;border:1px solid #dddfe2;box-shadow:0 1px 2px rgba(0,0,0,0.08);margin-bottom:16px;}
-.sett-card-title{font-size:15px;font-weight:700;color:#050505;margin-bottom:14px;display:flex;align-items:center;gap:6px;}
-.sett-input{width:100%;padding:10px 14px;border-radius:8px;border:1.5px solid #dddfe2;font-size:14px;font-family:inherit;color:#050505;outline:none;background:#fff;box-sizing:border-box;transition:border .15s;}
-.sett-input:focus{border-color:#1877f2;box-shadow:0 0 0 2px rgba(24,119,242,0.15);}
-.sett-btn-primary{padding:10px 20px;background:#1877f2;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;font-family:inherit;transition:background .15s;}
-.sett-btn-primary:hover{background:#166fe5;}
-.sett-btn-primary:disabled{opacity:.6;cursor:not-allowed;}
-.sett-btn-ghost{padding:10px 16px;background:#f0f2f5;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:inherit;color:#050505;transition:background .15s;}
-.sett-btn-ghost:hover{background:#e4e6eb;}
-.sett-btn-small{padding:6px 14px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;transition:background .15s;}
-.sett-store-name-row{display:flex;align-items:center;gap:12px;margin-top:4px;}
-.sett-store-name-text{font-size:18px;font-weight:700;color:#050505;}
-.sett-link-input{flex:1;padding:10px 14px;border-radius:8px;border:1.5px solid #dddfe2;font-size:13px;font-family:inherit;color:#050505;background:#f0f2f5;outline:none;direction:ltr;text-align:left;}
-.sett-invite-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
-.sett-select{padding:10px 12px;border:1.5px solid #dddfe2;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:#050505;outline:none;cursor:pointer;}
-.sett-invite-item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0f2f5;}
-.sett-invite-item:last-child{border-bottom:none;}
-.sett-member-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0f2f5;}
-.sett-member-row:last-child{border-bottom:none;}
-.sett-avatar{width:38px;height:38px;border-radius:50%;background:#e7f3ff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
-.sett-role-pill{padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;}
-.sett-msg-success{color:#31a24c;font-size:13px;margin-top:8px;display:flex;align-items:center;gap:4px;}
-.sett-msg-error{color:#e41e3f;font-size:13px;margin-top:8px;}
-.sett-info-text{font-size:12.5px;color:#65676b;margin-top:6px;line-height:1.5;}
-`;
-
 export default function Settings({ storeName, onStoreNameChange }: Props) {
   const { t } = useTranslation();
   const [members, setMembers] = useState<Member[]>([]);
@@ -80,15 +50,16 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState(storeName || '');
   const [savingName, setSavingName] = useState(false);
+
+  // حالة slug المتجر
   const [storeSlug, setStoreSlug] = useState('');
   const [storeLink, setStoreLink] = useState('');
-  const [linkCopied, setLinkCopied] = useState(false);
 
   const storeId = localStorage.getItem('store_id');
 
   useEffect(() => {
     loadData();
-    loadStoreSlug();
+    loadStoreSlug(); // جلب slug المتجر
   }, []);
 
   const loadData = async () => {
@@ -115,7 +86,9 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
         setStoreSlug(data.slug);
         setStoreLink(`${window.location.origin}/store/${data.slug}`);
       }
-    } catch {}
+    } catch (err) {
+      console.error('فشل جلب slug المتجر', err);
+    }
   };
 
   const handleInvite = async () => {
@@ -141,15 +114,10 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
   };
 
   const copyInviteLink = (token: string) => {
-    navigator.clipboard.writeText(`${FRONTEND}/join/${token}`);
+    const link = `${FRONTEND}/join/${token}`;
+    navigator.clipboard.writeText(link);
     setCopiedToken(token);
     setTimeout(() => setCopiedToken(''), 2000);
-  };
-
-  const copyStoreLink = () => {
-    navigator.clipboard.writeText(storeLink);
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2000);
   };
 
   const handleRemoveMember = async (userId: string) => {
@@ -175,177 +143,178 @@ export default function Settings({ storeName, onStoreNameChange }: Props) {
         localStorage.setItem('store_name', data.name);
         onStoreNameChange(data.name);
         setEditingName(false);
-        loadStoreSlug();
+        loadStoreSlug(); // تحديث slug بعد تغيير الاسم
       }
     } catch {}
     setSavingName(false);
   };
 
   const roleColor = (role: string) => {
-    if (role === t('settings.owner'))   return { bg: '#f3e8ff', color: '#7c3aed' };
-    if (role === t('settings.manager')) return { bg: '#dbeafe', color: '#1d4ed8' };
-    return { bg: '#dcfce7', color: '#15803d' };
+    if (role === t('settings.owner')) return '#7c3aed';
+    if (role === t('settings.manager')) return '#2563eb';
+    return '#059669';
   };
 
-  if (loading) return (
-    <div className="page">
-      <div className="empty">
-        <div className="loading-spinner" style={{ margin: '0 auto 12px' }}></div>
-        {t('common.loading')}
-      </div>
-    </div>
-  );
+  if (loading) return <div className="page"><div className="empty">{t('common.loading')}</div></div>;
 
   return (
-    <>
-      <style>{S}</style>
-      <div className="sett-root">
-        <div className="sett-page-title">⚙️ {t('settings.title')}</div>
+    <div className="page" dir="rtl">
+      <div className="page-title">⚙️ {t('settings.title')}</div>
 
-        {/* Store name */}
-        <div className="sett-card">
-          <div className="sett-card-title">🏪 {t('settings.storeName')}</div>
-          {editingName ? (
-            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-              <input
-                className="sett-input"
-                value={newName}
-                onChange={e => setNewName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSaveName()}
-                style={{ flex: 1 }}
-                autoFocus
-              />
-              <button onClick={handleSaveName} disabled={savingName} className="sett-btn-primary">
-                {savingName ? t('common.saving') : t('common.save')}
-              </button>
-              <button onClick={() => setEditingName(false)} className="sett-btn-ghost">{t('common.cancel')}</button>
-            </div>
-          ) : (
-            <div className="sett-store-name-row">
-              <span className="sett-store-name-text">🏪 {storeName}</span>
-              <button
-                onClick={() => { setNewName(storeName || ''); setEditingName(true); }}
-                className="sett-btn-small"
-                style={{ background: '#f0f2f5', color: '#050505' }}
-              >
-                ✏️ {t('common.edit')}
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Public store link */}
-        {storeLink && (
-          <div className="sett-card">
-            <div className="sett-card-title">🌐 {t('settings.publicStoreLink') || 'رابط متجرك العام'}</div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-              <input className="sett-link-input" readOnly value={storeLink} />
-              <button
-                onClick={copyStoreLink}
-                className="sett-btn-primary"
-                style={{ whiteSpace: 'nowrap', background: linkCopied ? '#31a24c' : '#1877f2' }}
-              >
-                {linkCopied ? '✅ تم النسخ' : '📋 نسخ'}
-              </button>
-            </div>
-            <p className="sett-info-text">
-              شارك هذا الرابط مع عملائك لزيارة متجرك الإلكتروني وطلب المنتجات مباشرة.
-            </p>
-          </div>
-        )}
-
-        {/* Invite member */}
-        <div className="sett-card">
-          <div className="sett-card-title">➕ {t('settings.inviteMember')}</div>
-          <div className="sett-invite-row">
+      {/* اسم المتجر */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card-title">{t('settings.storeName')}</div>
+        {editingName ? (
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <input
-              className="sett-input"
-              style={{ flex: 1, minWidth: 180 }}
-              value={inviteEmail}
-              onChange={e => setInviteEmail(e.target.value)}
-              placeholder={t('settings.emailPlaceholder')}
-              type="email"
-              onKeyDown={e => e.key === 'Enter' && handleInvite()}
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              style={{ flex: 1, padding: '10px 14px', borderRadius: 8, border: '1px solid #ddd', fontSize: 15 }}
+              onKeyDown={e => e.key === 'Enter' && handleSaveName()}
             />
-            <select className="sett-select" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
-              <option>{t('settings.employee')}</option>
-              <option>{t('settings.manager')}</option>
-            </select>
-            <button onClick={handleInvite} disabled={inviting} className="sett-btn-primary">
-              {inviting ? t('settings.sending') : t('settings.createInvite')}
+            <button
+              onClick={handleSaveName}
+              disabled={savingName}
+              style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+            >
+              {savingName ? t('common.saving') : t('common.save')}
+            </button>
+            <button
+              onClick={() => setEditingName(false)}
+              style={{ padding: '10px 16px', background: 'none', border: '1px solid #ddd', borderRadius: 8, cursor: 'pointer' }}
+            >
+              {t('common.cancel')}
             </button>
           </div>
-          {inviteError && <div className="sett-msg-error">{inviteError}</div>}
-          {inviteSuccess && <div className="sett-msg-success">✅ {inviteSuccess}</div>}
-        </div>
-
-        {/* Pending invitations */}
-        {invitations.filter(i => !i.acceptedAt).length > 0 && (
-          <div className="sett-card">
-            <div className="sett-card-title">📨 {t('settings.pendingInvites')}</div>
-            {invitations.filter(i => !i.acceptedAt).map(inv => (
-              <div key={inv.id} className="sett-invite-item">
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{inv.email}</div>
-                  <div style={{ fontSize: 12, color: '#65676b', marginTop: 2 }}>
-                    {inv.role} · {t('settings.expires')} {new Date(inv.expiresAt).toLocaleDateString('ar-SA')}
-                  </div>
-                </div>
-                <button
-                  onClick={() => copyInviteLink(inv.token)}
-                  className="sett-btn-small"
-                  style={{
-                    background: copiedToken === inv.token ? '#dcfce7' : '#f0f2f5',
-                    color: copiedToken === inv.token ? '#15803d' : '#050505',
-                  }}
-                >
-                  {copiedToken === inv.token ? '✅ ' + t('settings.copied') : '🔗 ' + t('settings.copyLink')}
-                </button>
-              </div>
-            ))}
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+            <span style={{ fontSize: 18, fontWeight: 600 }}>🏪 {storeName}</span>
+            <button
+              onClick={() => { setNewName(storeName || ''); setEditingName(true); }}
+              style={{ padding: '6px 14px', background: 'none', border: '1px solid #ddd', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}
+            >
+              {t('common.edit')}
+            </button>
           </div>
         )}
+      </div>
 
-        {/* Members */}
-        <div className="sett-card">
-          <div className="sett-card-title">👥 {t('settings.members')} ({members.length})</div>
-          {members.map(member => {
-            const rc = roleColor(member.role);
-            return (
-              <div key={member.id} className="sett-member-row">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {member.user?.avatarUrl ? (
-                    <img src={member.user.avatarUrl} alt="" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover' }} />
-                  ) : (
-                    <div className="sett-avatar">👤</div>
-                  )}
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>{member.user?.name || t('settings.user')}</div>
-                    <div style={{ fontSize: 12, color: '#65676b' }}>{member.user?.email}</div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="sett-role-pill" style={{ background: rc.bg, color: rc.color }}>
-                    {member.role}
-                  </span>
-                  {member.role !== t('settings.owner') && (
-                    <button
-                      onClick={() => handleRemoveMember(member.userId)}
-                      className="sett-btn-small"
-                      style={{ background: '#fee2e2', color: '#c0392b' }}
-                    >
-                      {t('settings.remove')}
-                    </button>
-                  )}
+      {/* رابط المتجر العام */}
+      {storeLink && (
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div className="card-title">🌐 {t('settings.publicStoreLink') || 'رابط متجرك العام'}</div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <input
+              type="text"
+              readOnly
+              value={storeLink}
+              style={{ flex: 1, padding: '10px 14px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, background: '#f8f9fa' }}
+            />
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(storeLink);
+                alert('تم نسخ الرابط بنجاح');
+              }}
+              style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+            >
+              📋 نسخ الرابط
+            </button>
+          </div>
+          <p style={{ fontSize: 12, color: '#666', marginTop: 8 }}>
+            يمكنك مشاركة هذا الرابط مع عملائك لزيارة متجرك الإلكتروني وطلب المنتجات مباشرة.
+          </p>
+        </div>
+      )}
+
+      {/* دعوة عضو جديد */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card-title">➕ {t('settings.inviteMember')}</div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+          <input
+            value={inviteEmail}
+            onChange={e => setInviteEmail(e.target.value)}
+            placeholder={t('settings.emailPlaceholder')}
+            type="email"
+            style={{ flex: 1, minWidth: 200, padding: '10px 14px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
+            onKeyDown={e => e.key === 'Enter' && handleInvite()}
+          />
+          <select
+            value={inviteRole}
+            onChange={e => setInviteRole(e.target.value)}
+            style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
+          >
+            <option>{t('settings.employee')}</option>
+            <option>{t('settings.manager')}</option>
+          </select>
+          <button
+            onClick={handleInvite}
+            disabled={inviting}
+            style={{ padding: '10px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}
+          >
+            {inviting ? t('settings.sending') : t('settings.createInvite')}
+          </button>
+        </div>
+        {inviteError && <div style={{ color: 'red', marginTop: 8, fontSize: 13 }}>{inviteError}</div>}
+        {inviteSuccess && <div style={{ color: '#059669', marginTop: 8, fontSize: 13 }}>✅ {inviteSuccess}</div>}
+      </div>
+
+      {/* الدعوات المعلقة */}
+      {invitations.filter(i => !i.acceptedAt).length > 0 && (
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div className="card-title">📨 {t('settings.pendingInvites')}</div>
+          {invitations.filter(i => !i.acceptedAt).map(inv => (
+            <div key={inv.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f3f4f6' }}>
+              <div>
+                <div style={{ fontWeight: 500 }}>{inv.email}</div>
+                <div style={{ fontSize: 12, color: '#888' }}>
+                  {inv.role} · {t('settings.expires')} {new Date(inv.expiresAt).toLocaleDateString('ar-SA')}
                 </div>
               </div>
-            );
-          })}
-          {members.length === 0 && (
-            <div className="empty">{t('settings.noMembers') || 'لا يوجد أعضاء'}</div>
-          )}
+              <button
+                onClick={() => copyInviteLink(inv.token)}
+                style={{ padding: '6px 14px', background: copiedToken === inv.token ? '#059669' : '#f3f4f6', color: copiedToken === inv.token ? 'white' : '#444', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}
+              >
+                {copiedToken === inv.token ? t('settings.copied') : t('settings.copyLink')}
+              </button>
+            </div>
+          ))}
         </div>
+      )}
+
+      {/* الأعضاء */}
+      <div className="card">
+        <div className="card-title">👥 {t('settings.members')} ({members.length})</div>
+        {members.map(member => (
+          <div key={member.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f3f4f6' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {member.user?.avatarUrl ? (
+                <img src={member.user.avatarUrl} alt="" style={{ width: 36, height: 36, borderRadius: '50%' }} />
+              ) : (
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>
+                  👤
+                </div>
+              )}
+              <div>
+                <div style={{ fontWeight: 500 }}>{member.user?.name || t('settings.user')}</div>
+                <div style={{ fontSize: 12, color: '#888' }}>{member.user?.email}</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: roleColor(member.role) + '20', color: roleColor(member.role) }}>
+                {member.role}
+              </span>
+              {member.role !== t('settings.owner') && (
+                <button
+                  onClick={() => handleRemoveMember(member.userId)}
+                  style={{ padding: '4px 10px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}
+                >
+                  {t('settings.remove')}
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
-    </>
+    </div>
   );
 }
