@@ -1,45 +1,426 @@
 // src/pages/Storefront.tsx
 import { useEffect, useState, useMemo } from 'react';
-import { ShoppingCart, Plus, Minus, X, Search, Star, Heart, LayoutGrid, List, Truck, Shield, Package, Tag } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, X, Search, LayoutGrid, List } from 'lucide-react';
 
 const BACKEND = 'https://store-dashboard-backend.onrender.com';
 
+/* ─────────────── types ─────────────── */
 interface Product {
-  id: string;
-  name: string;
-  price: number;
-  original_price?: number;
-  quantity: number;
-  reserved_quantity?: number;
-  availableQuantity?: number;
-  image_url?: string;
-  description?: string;
-  category?: string;
-  rating?: number;
-  review_count?: number;
-  variants?: ProductVariant[];
+  id: string; name: string; price: number; original_price?: number;
+  quantity: number; reserved_quantity?: number; availableQuantity?: number;
+  image_url?: string; description?: string; category?: string;
+  rating?: number; review_count?: number; variants?: ProductVariant[];
 }
-
 interface ProductVariant {
-  id: string;
-  title: string;
-  attributes: Record<string, string>;
-  price: number;
-  quantity: number;
-  sku?: string;
-  image_url?: string;
+  id: string; title: string; attributes: Record<string, string>;
+  price: number; quantity: number; sku?: string; image_url?: string;
 }
-
 interface CartItem {
-  productId: string;
-  variantId: string | null;
-  productName: string;
-  price: number;
-  quantity: number;
-  isReservation: boolean;
+  productId: string; variantId: string | null; productName: string;
+  price: number; quantity: number; isReservation: boolean;
   attributes?: Record<string, string>;
 }
 
+/* ─────────────── styles (injected once) ─────────────── */
+const css = `
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=Cairo:wght@400;600;700&display=swap');
+
+:root {
+  --md-primary: #1565C0;
+  --md-primary-dark: #0D47A1;
+  --md-primary-light: #E3F2FD;
+  --md-secondary: #FF6F00;
+  --md-secondary-light: #FFF8E1;
+  --md-surface: #FFFFFF;
+  --md-surface2: #F5F7FA;
+  --md-surface3: #ECEFF4;
+  --md-on-primary: #FFFFFF;
+  --md-text-high: #0D1B2A;
+  --md-text-med: #4A5568;
+  --md-text-low: #A0AEC0;
+  --md-divider: #E2E8F0;
+  --md-success: #2E7D32;
+  --md-success-bg: #E8F5E9;
+  --md-error: #C62828;
+  --md-error-bg: #FFEBEE;
+  --md-warning: #E65100;
+  --md-warning-bg: #FFF3E0;
+  --md-elevation1: 0 2px 4px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --md-elevation2: 0 4px 12px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06);
+  --md-elevation3: 0 8px 24px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.08);
+  --md-elevation4: 0 16px 48px rgba(0,0,0,0.14), 0 8px 16px rgba(0,0,0,0.08);
+  --md-radius-sm: 8px;
+  --md-radius: 12px;
+  --md-radius-lg: 20px;
+  --md-radius-xl: 28px;
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+.sf-root{font-family:'Tajawal',sans-serif;background:var(--md-surface2);color:var(--md-text-high);direction:rtl;min-height:100vh}
+
+/* ── HEADER ── */
+.sf-header{
+  position:sticky;top:0;z-index:200;
+  background:var(--md-primary);
+  box-shadow:var(--md-elevation3);
+}
+.sf-header-inner{
+  max-width:1440px;margin:0 auto;
+  height:68px;padding:0 24px;
+  display:flex;align-items:center;gap:16px;
+}
+.sf-brand{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.sf-logo{width:44px;height:44px;border-radius:12px;object-fit:cover;background:#fff}
+.sf-logo-placeholder{
+  width:44px;height:44px;border-radius:12px;
+  background:rgba(255,255,255,0.18);
+  display:flex;align-items:center;justify-content:center;font-size:24px;
+}
+.sf-brand-name{font-size:20px;font-weight:800;color:#fff;letter-spacing:-0.3px}
+.sf-search-wrap{
+  flex:1;position:relative;max-width:520px;margin:0 auto;
+}
+.sf-search-icon{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,0.6);pointer-events:none}
+.sf-search{
+  width:100%;height:44px;padding:0 44px 0 16px;
+  background:rgba(255,255,255,0.15);
+  border:1.5px solid rgba(255,255,255,0.25);
+  border-radius:100px;color:#fff;
+  font-family:'Tajawal',sans-serif;font-size:14px;outline:none;
+  transition:all .2s;
+}
+.sf-search::placeholder{color:rgba(255,255,255,0.55)}
+.sf-search:focus{background:rgba(255,255,255,0.22);border-color:rgba(255,255,255,0.5)}
+.sf-cart-btn{
+  display:flex;align-items:center;gap:8px;
+  background:var(--md-secondary);color:#fff;
+  border:none;border-radius:100px;
+  padding:10px 20px;cursor:pointer;
+  font-family:'Tajawal',sans-serif;font-size:14px;font-weight:700;
+  box-shadow:0 4px 12px rgba(255,111,0,0.4);
+  transition:all .2s;flex-shrink:0;white-space:nowrap;
+}
+.sf-cart-btn:hover{background:#E65100;transform:translateY(-1px);box-shadow:0 6px 16px rgba(255,111,0,0.45)}
+.sf-cart-count{
+  background:#fff;color:var(--md-secondary);
+  width:20px;height:20px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;
+}
+
+/* ── HERO ── */
+.sf-hero{
+  background:linear-gradient(145deg, var(--md-primary-dark) 0%, var(--md-primary) 50%, #1976D2 100%);
+  padding:72px 24px 80px;text-align:center;color:#fff;position:relative;overflow:hidden;
+}
+.sf-hero::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 800px 400px at 50% 120%, rgba(255,111,0,0.18) 0%, transparent 70%);
+}
+.sf-hero-title{
+  font-size:clamp(32px,5vw,52px);font-weight:900;
+  letter-spacing:-1px;margin-bottom:14px;
+  text-shadow:0 2px 20px rgba(0,0,0,0.2);position:relative;
+}
+.sf-hero-sub{font-size:18px;opacity:.75;position:relative;font-weight:400}
+.sf-hero-chips{display:flex;justify-content:center;gap:12px;margin-top:28px;flex-wrap:wrap;position:relative}
+.sf-chip{
+  display:flex;align-items:center;gap:6px;
+  background:rgba(255,255,255,0.12);
+  border:1px solid rgba(255,255,255,0.2);
+  color:#fff;padding:7px 16px;border-radius:100px;font-size:13px;font-weight:500;
+}
+
+/* ── LAYOUT ── */
+.sf-layout{max-width:1440px;margin:0 auto;padding:32px 24px;display:flex;gap:24px;align-items:flex-start}
+
+/* ── SIDEBAR ── */
+.sf-sidebar{width:256px;flex-shrink:0;position:sticky;top:84px;display:flex;flex-direction:column;gap:16px}
+.sf-panel{
+  background:var(--md-surface);border-radius:var(--md-radius-lg);
+  box-shadow:var(--md-elevation1);border:1px solid var(--md-divider);
+  overflow:hidden;
+}
+.sf-panel-title{
+  padding:14px 18px;font-size:13px;font-weight:700;
+  color:var(--md-text-med);text-transform:uppercase;letter-spacing:1px;
+  border-bottom:1px solid var(--md-divider);background:var(--md-surface2);
+}
+.sf-cat-btn{
+  display:block;width:100%;padding:11px 18px;
+  text-align:right;border:none;background:transparent;
+  font-family:'Tajawal',sans-serif;font-size:14px;font-weight:500;
+  color:var(--md-text-med);cursor:pointer;transition:all .15s;
+  border-bottom:1px solid var(--md-divider);
+}
+.sf-cat-btn:last-child{border-bottom:none}
+.sf-cat-btn:hover{background:var(--md-primary-light);color:var(--md-primary)}
+.sf-cat-btn.active{background:var(--md-primary-light);color:var(--md-primary);font-weight:700}
+.sf-filter-body{padding:16px 18px;display:flex;flex-direction:column;gap:14px}
+.sf-filter-label{font-size:12px;font-weight:600;color:var(--md-text-med);margin-bottom:6px;display:flex;justify-content:space-between}
+.sf-range{width:100%;accent-color:var(--md-primary);cursor:pointer}
+.sf-toggle{display:flex;align-items:center;gap:8px;cursor:pointer}
+.sf-toggle input{accent-color:var(--md-primary);width:16px;height:16px;cursor:pointer}
+.sf-toggle span{font-size:14px;font-weight:500}
+
+/* ── PRODUCTS AREA ── */
+.sf-products-area{flex:1;min-width:0}
+.sf-toolbar{
+  background:var(--md-surface);border-radius:var(--md-radius-lg);
+  box-shadow:var(--md-elevation1);border:1px solid var(--md-divider);
+  padding:12px 18px;
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:20px;gap:12px;flex-wrap:wrap;
+}
+.sf-sort{
+  height:38px;padding:0 14px;
+  border:1.5px solid var(--md-divider);border-radius:var(--md-radius-sm);
+  background:#fff;font-family:'Tajawal',sans-serif;font-size:14px;
+  color:var(--md-text-high);outline:none;cursor:pointer;transition:.2s;
+}
+.sf-sort:focus{border-color:var(--md-primary)}
+.sf-view-btns{display:flex;gap:4px}
+.sf-view-btn{
+  width:36px;height:36px;border-radius:var(--md-radius-sm);
+  border:1.5px solid var(--md-divider);background:#fff;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--md-text-low);transition:.15s;
+}
+.sf-view-btn.active{background:var(--md-primary);border-color:var(--md-primary);color:#fff}
+.sf-count{font-size:13px;color:var(--md-text-med);font-weight:500}
+
+/* ── PRODUCT CARD (GRID) ── */
+.sf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:20px}
+.sf-card{
+  background:var(--md-surface);border-radius:var(--md-radius-lg);
+  border:1px solid var(--md-divider);overflow:hidden;
+  box-shadow:var(--md-elevation1);
+  transition:box-shadow .25s, transform .25s;
+  display:flex;flex-direction:column;
+}
+.sf-card:hover{box-shadow:var(--md-elevation3);transform:translateY(-3px)}
+.sf-card-img{position:relative;padding-top:75%;background:var(--md-surface3)}
+.sf-card-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.sf-card-img-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:48px;color:var(--md-text-low)}
+.sf-out-badge{
+  position:absolute;inset:0;background:rgba(13,27,42,0.6);
+  display:flex;align-items:center;justify-content:center;
+}
+.sf-out-badge span{
+  background:#fff;padding:6px 18px;border-radius:100px;
+  font-size:13px;font-weight:700;color:var(--md-error);
+}
+.sf-discount-badge{
+  position:absolute;top:12px;left:12px;
+  background:var(--md-secondary);color:#fff;
+  font-size:12px;font-weight:800;
+  padding:4px 10px;border-radius:100px;
+  box-shadow:0 2px 8px rgba(255,111,0,0.4);
+}
+.sf-card-body{padding:16px;flex:1;display:flex;flex-direction:column;gap:10px}
+.sf-cat-tag{font-size:11px;font-weight:600;color:var(--md-primary);background:var(--md-primary-light);padding:3px 10px;border-radius:100px;display:inline-block}
+.sf-card-name{font-size:15px;font-weight:700;color:var(--md-text-high);line-height:1.4}
+.sf-card-desc{font-size:12px;color:var(--md-text-med);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.sf-variants{display:flex;flex-direction:column;gap:8px}
+.sf-variant-label{font-size:12px;font-weight:700;color:var(--md-text-high)}
+.sf-variant-opts{display:flex;flex-wrap:wrap;gap:6px}
+.sf-variant-btn{
+  padding:4px 12px;border-radius:100px;
+  border:1.5px solid var(--md-divider);background:#fff;
+  font-family:'Tajawal',sans-serif;font-size:12px;font-weight:600;
+  color:var(--md-text-med);cursor:pointer;transition:.15s;
+}
+.sf-variant-btn.active{border-color:var(--md-primary);background:var(--md-primary-light);color:var(--md-primary)}
+.sf-card-footer{padding:0 16px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sf-price-wrap{display:flex;flex-direction:column}
+.sf-price{font-size:20px;font-weight:800;color:var(--md-text-high)}
+.sf-price-orig{font-size:12px;color:var(--md-text-low);text-decoration:line-through}
+.sf-add-btn{
+  display:flex;align-items:center;gap:6px;
+  background:var(--md-primary);color:#fff;
+  border:none;border-radius:100px;
+  padding:9px 18px;cursor:pointer;
+  font-family:'Tajawal',sans-serif;font-size:13px;font-weight:700;
+  box-shadow:0 4px 12px rgba(21,101,192,0.35);
+  transition:all .2s;white-space:nowrap;flex-shrink:0;
+}
+.sf-add-btn:hover{background:var(--md-primary-dark);box-shadow:0 6px 16px rgba(21,101,192,0.4);transform:translateY(-1px)}
+.sf-add-btn:disabled{background:var(--md-surface3);color:var(--md-text-low);box-shadow:none;cursor:default;transform:none}
+
+/* ── LIST VIEW ── */
+.sf-list{display:flex;flex-direction:column;gap:14px}
+.sf-list-card{
+  background:var(--md-surface);border-radius:var(--md-radius-lg);
+  border:1px solid var(--md-divider);overflow:hidden;
+  box-shadow:var(--md-elevation1);
+  display:flex;transition:box-shadow .25s;
+}
+.sf-list-card:hover{box-shadow:var(--md-elevation2)}
+.sf-list-img{width:140px;flex-shrink:0;position:relative;background:var(--md-surface3)}
+.sf-list-img img{width:100%;height:100%;object-fit:cover;display:block}
+.sf-list-img-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:40px;min-height:120px}
+.sf-list-body{flex:1;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.sf-list-info{flex:1}
+.sf-list-right{display:flex;flex-direction:column;align-items:flex-end;gap:10px;flex-shrink:0}
+
+/* ── EMPTY ── */
+.sf-empty{
+  background:var(--md-surface);border-radius:var(--md-radius-lg);
+  border:1px solid var(--md-divider);padding:80px 20px;
+  text-align:center;
+}
+.sf-empty-icon{font-size:56px;margin-bottom:16px}
+.sf-empty-title{font-size:18px;font-weight:700;margin-bottom:8px}
+.sf-empty-sub{font-size:14px;color:var(--md-text-med)}
+
+/* ── CART DRAWER ── */
+.sf-backdrop{position:fixed;inset:0;background:rgba(13,27,42,0.6);z-index:400;display:flex;justify-content:flex-end;backdrop-filter:blur(2px)}
+.sf-drawer{
+  width:100%;max-width:460px;background:var(--md-surface);
+  height:100vh;display:flex;flex-direction:column;
+  box-shadow:-8px 0 40px rgba(0,0,0,0.2);
+}
+.sf-drawer-header{
+  padding:20px 24px;
+  background:var(--md-primary);color:#fff;
+  display:flex;justify-content:space-between;align-items:center;
+  flex-shrink:0;
+}
+.sf-drawer-title{font-size:18px;font-weight:800}
+.sf-drawer-close{
+  width:36px;height:36px;border-radius:50%;
+  background:rgba(255,255,255,0.15);border:none;color:#fff;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:.15s;
+}
+.sf-drawer-close:hover{background:rgba(255,255,255,0.25)}
+.sf-drawer-body{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:0}
+.sf-cart-item{
+  display:flex;gap:14px;padding:16px 0;
+  border-bottom:1px solid var(--md-divider);
+}
+.sf-cart-item:last-child{border-bottom:none}
+.sf-cart-thumb{
+  width:76px;height:76px;border-radius:var(--md-radius);
+  background:var(--md-surface3);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:28px;overflow:hidden;
+}
+.sf-cart-thumb img{width:100%;height:100%;object-fit:cover}
+.sf-cart-info{flex:1}
+.sf-cart-name{font-size:14px;font-weight:700;margin-bottom:4px;line-height:1.3}
+.sf-cart-attrs{font-size:12px;color:var(--md-text-med);margin-bottom:8px}
+.sf-cart-price{font-size:15px;font-weight:800;color:var(--md-primary)}
+.sf-qty-row{display:flex;align-items:center;gap:10px;margin-top:8px}
+.sf-qty-btn{
+  width:30px;height:30px;border-radius:50%;
+  border:1.5px solid var(--md-divider);background:#fff;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--md-text-high);transition:.15s;
+}
+.sf-qty-btn:hover{background:var(--md-primary-light);border-color:var(--md-primary);color:var(--md-primary)}
+.sf-qty-num{font-size:15px;font-weight:700;min-width:20px;text-align:center}
+.sf-remove-btn{background:none;border:none;color:var(--md-text-low);cursor:pointer;font-size:12px;font-family:'Tajawal',sans-serif;margin-right:auto;transition:.15s}
+.sf-remove-btn:hover{color:var(--md-error)}
+
+/* ── CHECKOUT FORM ── */
+.sf-form{display:flex;flex-direction:column;gap:12px;margin-top:8px}
+.sf-input{
+  width:100%;padding:12px 14px;
+  border:1.5px solid var(--md-divider);border-radius:var(--md-radius);
+  font-family:'Tajawal',sans-serif;font-size:14px;
+  color:var(--md-text-high);outline:none;transition:.2s;background:#fff;
+}
+.sf-input:focus{border-color:var(--md-primary);box-shadow:0 0 0 3px rgba(21,101,192,0.1)}
+.sf-input::placeholder{color:var(--md-text-low)}
+textarea.sf-input{resize:vertical;min-height:72px}
+.sf-payment-label{font-size:13px;font-weight:700;color:var(--md-text-med);margin-bottom:8px}
+.sf-payment-opts{display:flex;gap:8px}
+.sf-pay-btn{
+  flex:1;padding:10px;
+  border:2px solid var(--md-divider);border-radius:var(--md-radius);
+  background:#fff;font-family:'Tajawal',sans-serif;font-size:13px;font-weight:600;
+  color:var(--md-text-med);cursor:pointer;transition:.15s;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+}
+.sf-pay-btn.active{border-color:var(--md-primary);background:var(--md-primary-light);color:var(--md-primary)}
+.sf-pay-icon{font-size:20px}
+
+/* ── DRAWER FOOTER ── */
+.sf-drawer-footer{
+  padding:18px 24px;border-top:1px solid var(--md-divider);
+  background:var(--md-surface2);flex-shrink:0;
+}
+.sf-total-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.sf-total-label{font-size:14px;font-weight:600;color:var(--md-text-med)}
+.sf-total-price{font-size:26px;font-weight:900;color:var(--md-text-high)}
+.sf-checkout-btn{
+  width:100%;padding:15px;
+  background:linear-gradient(135deg,#25d366,#128C7E);
+  color:#fff;border:none;border-radius:100px;
+  font-family:'Tajawal',sans-serif;font-size:16px;font-weight:800;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  box-shadow:0 6px 20px rgba(37,211,102,0.4);
+  transition:all .2s;
+}
+.sf-checkout-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(37,211,102,0.45)}
+.sf-checkout-btn:disabled{opacity:.6;cursor:default;transform:none}
+
+/* ── SUCCESS ── */
+.sf-success{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;text-align:center;gap:16px}
+.sf-success-icon{
+  width:80px;height:80px;border-radius:50%;
+  background:var(--md-success-bg);color:var(--md-success);
+  display:flex;align-items:center;justify-content:center;font-size:40px;
+}
+.sf-success-title{font-size:22px;font-weight:800}
+.sf-success-sub{font-size:14px;color:var(--md-text-med)}
+.sf-continue-btn{
+  margin-top:8px;padding:12px 32px;
+  background:var(--md-primary);color:#fff;border:none;border-radius:100px;
+  font-family:'Tajawal',sans-serif;font-size:15px;font-weight:700;
+  cursor:pointer;box-shadow:0 4px 12px rgba(21,101,192,0.35);
+  transition:.2s;
+}
+.sf-continue-btn:hover{background:var(--md-primary-dark);transform:translateY(-1px)}
+
+/* ── LOADING / ERROR ── */
+.sf-loading{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;background:var(--md-surface2)}
+.sf-spinner{
+  width:48px;height:48px;border:4px solid var(--md-primary-light);
+  border-top-color:var(--md-primary);border-radius:50%;
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sf-loading p{font-size:15px;color:var(--md-text-med);font-family:'Tajawal',sans-serif}
+.sf-error{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:var(--md-surface2);text-align:center;padding:24px;font-family:'Tajawal',sans-serif}
+.sf-error-icon{font-size:56px}
+.sf-error h2{font-size:22px;font-weight:800;color:var(--md-text-high)}
+.sf-error p{font-size:14px;color:var(--md-text-med)}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px){
+  .sf-sidebar{display:none}
+  .sf-layout{padding:20px 16px}
+}
+@media(max-width:600px){
+  .sf-header-inner{padding:0 16px;gap:10px}
+  .sf-brand-name{display:none}
+  .sf-hero{padding:48px 16px 56px}
+  .sf-hero-title{font-size:28px}
+  .sf-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+  .sf-cart-btn span:first-of-type{display:none}
+}
+`;
+
+/* inject styles once */
+if (!document.getElementById('sf-styles')) {
+  const s = document.createElement('style');
+  s.id = 'sf-styles'; s.textContent = css;
+  document.head.appendChild(s);
+}
+
+/* ─────────────── component ─────────────── */
 export default function Storefront() {
   const slug = window.location.pathname.split('/store/')[1];
   const [store, setStore] = useState<any>(null);
@@ -53,7 +434,6 @@ export default function Storefront() {
   const [category, setCategory] = useState('الكل');
   const [sortBy, setSortBy] = useState('default');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [wishlist, setWishlist] = useState<Set<string>>(new Set());
   const [maxPrice, setMaxPrice] = useState(10000);
   const [onlyInStock, setOnlyInStock] = useState(false);
   const [imgErrors, setImgErrors] = useState<Set<string>>(new Set());
@@ -62,16 +442,14 @@ export default function Storefront() {
   useEffect(() => {
     if (!slug) return;
     fetch(`${BACKEND}/api/public/stores/${slug}`)
-      .then(res => res.json())
+      .then(r => r.json())
       .then(data => {
         if (data.products) {
           data.products = data.products.map((p: any) => ({
-            ...p,
-            availableQuantity: p.quantity - (p.reserved_quantity || 0),
+            ...p, availableQuantity: p.quantity - (p.reserved_quantity || 0),
           }));
         }
-        setStore(data);
-        setLoading(false);
+        setStore(data); setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [slug]);
@@ -79,14 +457,13 @@ export default function Storefront() {
   const products: Product[] = useMemo(() => {
     if (!store?.products) return [];
     return store.products.map((p: any) => ({
-      ...p,
-      availableQuantity: p.quantity - (p.reserved_quantity || 0),
+      ...p, availableQuantity: p.quantity - (p.reserved_quantity || 0),
     }));
   }, [store]);
 
   const categories = useMemo(() => {
     const cats = new Set(products.map(p => p.category).filter(Boolean));
-    return ['الكل', ...Array.from(cats)];
+    return ['الكل', ...Array.from(cats)] as string[];
   }, [products]);
 
   const topPrice = useMemo(() => Math.max(...products.map(p => p.price), 1000), [products]);
@@ -107,44 +484,22 @@ export default function Storefront() {
   const totalPrice = useMemo(() => cart.reduce((s, i) => s + i.price * i.quantity, 0), [cart]);
   const totalItems = useMemo(() => cart.reduce((s, i) => s + i.quantity, 0), [cart]);
 
-  // دالة للحصول على سعر وكمية المنتج بناءً على المتغير المختار
-  const getVariantPriceAndStock = (product: Product) => {
-    if (!product.variants || product.variants.length === 0) {
+  const getVariantInfo = (product: Product) => {
+    if (!product.variants?.length)
       return { price: product.price, available: product.availableQuantity ?? product.quantity, variantId: null };
-    }
     const selectedId = selectedVariants[product.id];
-    const variant = product.variants.find(v => v.id === selectedId);
-    if (variant) {
-      return { price: variant.price, available: variant.quantity, variantId: variant.id };
-    }
-    // إذا لم يتم اختيار متغير، نعرض أول متغير (أو نعطيه قيمة صفر)
-    const first = product.variants[0];
-    return { price: first.price, available: first.quantity, variantId: first.id };
+    const variant = product.variants.find(v => v.id === selectedId) ?? product.variants[0];
+    return { price: variant.price, available: variant.quantity, variantId: variant.id };
   };
 
   const addToCart = (product: Product) => {
-    const { price, available, variantId } = getVariantPriceAndStock(product);
-    if (available <= 0) {
-      alert('هذا المنتج غير متوفر حالياً');
-      return;
-    }
+    const { price, available, variantId } = getVariantInfo(product);
+    if (available <= 0) { alert('هذا المنتج غير متوفر حالياً'); return; }
     setCart(prev => {
-      const existingIndex = prev.findIndex(i => i.productId === product.id && i.variantId === variantId);
-      if (existingIndex !== -1) {
-        const updated = [...prev];
-        updated[existingIndex].quantity += 1;
-        return updated;
-      }
+      const idx = prev.findIndex(i => i.productId === product.id && i.variantId === variantId);
+      if (idx !== -1) { const u = [...prev]; u[idx].quantity += 1; return u; }
       const variant = product.variants?.find(v => v.id === variantId);
-      return [...prev, {
-        productId: product.id,
-        variantId,
-        productName: product.name,
-        price,
-        quantity: 1,
-        isReservation: false,
-        attributes: variant?.attributes,
-      }];
+      return [...prev, { productId: product.id, variantId, productName: product.name, price, quantity: 1, isReservation: false, attributes: variant?.attributes }];
     });
     setShowCart(true);
   };
@@ -153,14 +508,12 @@ export default function Storefront() {
     setCart(prev => prev.map(item => {
       if (item.productId !== productId || item.variantId !== variantId) return item;
       const newQty = item.quantity + delta;
-      if (newQty <= 0) return null;
-      return { ...item, quantity: newQty };
+      return newQty <= 0 ? null : { ...item, quantity: newQty };
     }).filter(Boolean) as CartItem[]);
   };
 
-  const removeFromCart = (productId: string, variantId: string | null) => {
+  const removeFromCart = (productId: string, variantId: string | null) =>
     setCart(prev => prev.filter(i => !(i.productId === productId && i.variantId === variantId)));
-  };
 
   const submitOrder = async () => {
     if (!customer.name.trim() || !customer.phone.trim()) return alert('يرجى ملء الاسم ورقم الجوال');
@@ -174,26 +527,22 @@ export default function Storefront() {
           customerName: customer.name,
           customerPhone: customer.phone,
           items: cart.map(i => ({
-            productId: i.productId,
-            variantId: i.variantId,
+            productId: i.productId, variantId: i.variantId,
             productName: i.productName + (i.attributes ? ` (${Object.values(i.attributes).join(', ')})` : ''),
-            quantity: i.quantity,
-            price: i.price,
-            isReservation: i.isReservation,
+            quantity: i.quantity, price: i.price, isReservation: i.isReservation,
           })),
           totalPrice,
           notes: `${customer.address}\n${customer.notes}\nطريقة الدفع: ${paymentMethod}`,
         }),
       });
       if (res.ok) {
-        const msg = `🛍️ طلب جديد\nالعميل: ${customer.name}\nالجوال: ${customer.phone}\nالعنوان: ${customer.address}\n\n${cart.map(i => `${i.productName} × ${i.quantity} = ${i.price * i.quantity} ر.س`).join('\n')}\nالإجمالي: ${totalPrice} ر.س\nالدفع: ${paymentMethod === 'cash' ? 'كاش' : paymentMethod === 'card' ? 'بطاقة' : 'تحويل'}`;
+        const payLabel = paymentMethod === 'cash' ? 'كاش' : paymentMethod === 'card' ? 'بطاقة' : 'تحويل';
+        const msg = `🛍️ *طلب جديد*\n👤 العميل: ${customer.name}\n📱 الجوال: ${customer.phone}\n📍 العنوان: ${customer.address}\n\n${cart.map(i => `• ${i.productName} × ${i.quantity} = ${(i.price * i.quantity).toLocaleString()} ر.س`).join('\n')}\n\n💰 *الإجمالي: ${totalPrice.toLocaleString()} ر.س*\n💳 الدفع: ${payLabel}`;
         window.open(`https://wa.me/${store.owner_phone || '966500000000'}?text=${encodeURIComponent(msg)}`, '_blank');
         setCart([]);
         setOrderStatus('success');
       }
-    } catch {
-      setOrderStatus('idle');
-    }
+    } catch { setOrderStatus('idle'); }
   };
 
   const resetOrder = () => {
@@ -202,127 +551,187 @@ export default function Storefront() {
     setShowCart(false);
   };
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 50 }}>جاري تحميل المتجر...</div>;
-  if (!store) return <div style={{ textAlign: 'center', padding: 50 }}>المتجر غير موجود</div>;
+  /* ── render variants helper ── */
+  const renderVariants = (p: Product) => {
+    if (!p.variants?.length) return null;
+    const attrMap = p.variants.reduce((acc, v) => {
+      Object.entries(v.attributes).forEach(([k, val]) => {
+        if (!acc[k]) acc[k] = new Set<string>();
+        acc[k].add(val);
+      });
+      return acc;
+    }, {} as Record<string, Set<string>>);
 
+    return (
+      <div className="sf-variants">
+        {Object.entries(attrMap).map(([attrName, values]) => (
+          <div key={attrName}>
+            <div className="sf-variant-label">{attrName}:</div>
+            <div className="sf-variant-opts">
+              {Array.from(values).map(val => {
+                const v = p.variants?.find(vr => vr.attributes[attrName] === val);
+                const active = selectedVariants[p.id] === v?.id;
+                return (
+                  <button key={val} className={`sf-variant-btn${active ? ' active' : ''}`}
+                    onClick={() => v && setSelectedVariants(prev => ({ ...prev, [p.id]: v.id }))}>
+                    {val}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  /* ── states ── */
+  if (loading) return (
+    <div className="sf-loading">
+      <div className="sf-spinner" />
+      <p>جاري تحميل المتجر...</p>
+    </div>
+  );
+  if (!store) return (
+    <div className="sf-error">
+      <div className="sf-error-icon">🏪</div>
+      <h2>المتجر غير موجود</h2>
+      <p>تأكد من صحة الرابط</p>
+    </div>
+  );
+
+  const discountPct = (p: Product) =>
+    p.original_price ? Math.round((1 - p.price / p.original_price) * 100) : 0;
+
+  /* ── main render ── */
   return (
-    <div style={{ fontFamily: 'Tajawal, sans-serif', background: '#f8f8f6', minHeight: '100vh', direction: 'rtl' }}>
-      {/* Header (نفس السابق) */}
-      <header style={{ position: 'sticky', top: 0, zIndex: 100, background: 'white', borderBottom: '1px solid #eaeaea', padding: '0 24px' }}>
-        <div style={{ maxWidth: 1400, margin: '0 auto', height: 68, display: 'flex', alignItems: 'center', gap: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {store.logo_url ? <img src={store.logo_url} alt="logo" style={{ width: 40, height: 40, borderRadius: 10 }} /> : <span style={{ fontSize: 32 }}>🏪</span>}
-            <span style={{ fontSize: 20, fontWeight: 700 }}>{store.name}</span>
+    <div className="sf-root">
+
+      {/* HEADER */}
+      <header className="sf-header">
+        <div className="sf-header-inner">
+          <div className="sf-brand">
+            {store.logo_url
+              ? <img src={store.logo_url} alt="logo" className="sf-logo" />
+              : <div className="sf-logo-placeholder">🏪</div>}
+            <span className="sf-brand-name">{store.name}</span>
           </div>
-          <div style={{ flex: 1, position: 'relative' }}>
-            <Search size={18} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: '#999' }} />
-            <input placeholder="ابحث عن منتج..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: '100%', height: 42, paddingRight: 44, paddingLeft: 16, border: '1.5px solid #eaeaea', borderRadius: 24, fontSize: 14, outline: 'none' }} />
+
+          <div className="sf-search-wrap">
+            <Search size={18} className="sf-search-icon" />
+            <input className="sf-search" placeholder="ابحث عن منتج..."
+              value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <button onClick={() => setShowCart(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#1a1a1a', color: '#fff', border: 'none', borderRadius: 24, padding: '10px 20px', cursor: 'pointer' }}>
+
+          <button className="sf-cart-btn" onClick={() => setShowCart(true)}>
             <ShoppingCart size={20} />
             <span>السلة</span>
-            {totalItems > 0 && <span style={{ background: '#ef4444', borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{totalItems}</span>}
+            {totalItems > 0 && <span className="sf-cart-count">{totalItems}</span>}
           </button>
         </div>
       </header>
 
-      {/* Hero */}
-      <div style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)', padding: '60px 24px', textAlign: 'center', color: '#fff' }}>
-        <h1 style={{ fontSize: 42, fontWeight: 800, marginBottom: 12 }}>{store.name}</h1>
-        <p style={{ fontSize: 18, opacity: 0.75 }}>{store.description || 'تسوق أفضل المنتجات بأسعار منافسة'}</p>
+      {/* HERO */}
+      <div className="sf-hero">
+        <h1 className="sf-hero-title">{store.name}</h1>
+        <p className="sf-hero-sub">{store.description || 'تسوق أفضل المنتجات بأسعار منافسة'}</p>
+        <div className="sf-hero-chips">
+          <div className="sf-chip"><span>🚚</span> شحن سريع</div>
+          <div className="sf-chip"><span>🔒</span> دفع آمن</div>
+          <div className="sf-chip"><span>↩️</span> إرجاع مجاني</div>
+        </div>
       </div>
 
-      {/* Main layout */}
-      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '32px 24px', display: 'flex', gap: 28 }}>
-        {/* Sidebar */}
-        <aside style={{ width: 240, position: 'sticky', top: 90 }}>
-          <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #eaeaea', padding: 20, marginBottom: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>الفئات</div>
+      {/* LAYOUT */}
+      <div className="sf-layout">
+
+        {/* SIDEBAR */}
+        <aside className="sf-sidebar">
+          <div className="sf-panel">
+            <div className="sf-panel-title">الفئات</div>
             {categories.map(cat => (
-              <button key={cat} onClick={() => setCategory(cat)} style={{ display: 'block', width: '100%', padding: '9px 14px', borderRadius: 10, background: category === cat ? '#1a1a1a' : 'transparent', color: category === cat ? '#fff' : '#444', textAlign: 'right', marginBottom: 4, cursor: 'pointer', border: 'none' }}>{cat}</button>
+              <button key={cat} className={`sf-cat-btn${category === cat ? ' active' : ''}`}
+                onClick={() => setCategory(cat)}>
+                {cat}
+              </button>
             ))}
           </div>
-          <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #eaeaea', padding: 20 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>فلتر</div>
-            <div><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span>السعر الأقصى</span><span>{maxPrice.toLocaleString()} ر.س</span></div><input type="range" min={0} max={topPrice} step={50} value={maxPrice} onChange={e => setMaxPrice(Number(e.target.value))} style={{ width: '100%', accentColor: '#1a1a1a' }} /></div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, cursor: 'pointer' }}><input type="checkbox" checked={onlyInStock} onChange={e => setOnlyInStock(e.target.checked)} /> <span>المتوفر فقط</span></label>
+
+          <div className="sf-panel">
+            <div className="sf-panel-title">فلتر</div>
+            <div className="sf-filter-body">
+              <div>
+                <div className="sf-filter-label">
+                  <span>السعر الأقصى</span>
+                  <span style={{ color: 'var(--md-primary)', fontWeight: 700 }}>{maxPrice.toLocaleString()} ر.س</span>
+                </div>
+                <input type="range" className="sf-range" min={0} max={topPrice} step={50}
+                  value={maxPrice} onChange={e => setMaxPrice(Number(e.target.value))} />
+              </div>
+              <label className="sf-toggle">
+                <input type="checkbox" checked={onlyInStock} onChange={e => setOnlyInStock(e.target.checked)} />
+                <span>المتوفر فقط</span>
+              </label>
+            </div>
           </div>
         </aside>
 
-        {/* Products */}
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ height: 36, padding: '0 12px', border: '1px solid #eaeaea', borderRadius: 8 }}>
+        {/* PRODUCTS */}
+        <div className="sf-products-area">
+
+          {/* TOOLBAR */}
+          <div className="sf-toolbar">
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <select className="sf-sort" value={sortBy} onChange={e => setSortBy(e.target.value)}>
                 <option value="default">الترتيب الافتراضي</option>
                 <option value="price-asc">السعر: من الأقل</option>
                 <option value="price-desc">السعر: من الأعلى</option>
                 <option value="rating">الأعلى تقييماً</option>
                 <option value="name">الاسم</option>
               </select>
-              <div style={{ display: 'flex', gap: 4 }}>
-                <button onClick={() => setViewMode('grid')} style={{ width: 36, height: 36, border: '1px solid #eaeaea', borderRadius: 8, background: viewMode === 'grid' ? '#1a1a1a' : '#fff', color: viewMode === 'grid' ? '#fff' : '#666' }}><LayoutGrid size={18} /></button>
-                <button onClick={() => setViewMode('list')} style={{ width: 36, height: 36, border: '1px solid #eaeaea', borderRadius: 8, background: viewMode === 'list' ? '#1a1a1a' : '#fff', color: viewMode === 'list' ? '#fff' : '#666' }}><List size={18} /></button>
+              <div className="sf-view-btns">
+                <button className={`sf-view-btn${viewMode === 'grid' ? ' active' : ''}`} onClick={() => setViewMode('grid')}><LayoutGrid size={16} /></button>
+                <button className={`sf-view-btn${viewMode === 'list' ? ' active' : ''}`} onClick={() => setViewMode('list')}><List size={16} /></button>
               </div>
             </div>
-            <span>{filtered.length} منتج</span>
+            <span className="sf-count">{filtered.length} منتج</span>
           </div>
 
+          {/* PRODUCT LIST */}
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 60, background: '#fff', borderRadius: 16 }}><div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div><p>لا توجد منتجات</p></div>
+            <div className="sf-empty">
+              <div className="sf-empty-icon">🔍</div>
+              <div className="sf-empty-title">لا توجد منتجات</div>
+              <div className="sf-empty-sub">جرب تغيير الفلتر أو كلمة البحث</div>
+            </div>
           ) : viewMode === 'grid' ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 20 }}>
+            <div className="sf-grid">
               {filtered.map(p => {
-                const { price, available } = getVariantPriceAndStock(p);
+                const { price, available, variantId: _ } = getVariantInfo(p);
                 const isOut = available <= 0;
-                const hasVariants = p.variants && p.variants.length > 0;
+                const disc = discountPct(p);
                 return (
-                  <div key={p.id} style={{ background: '#fff', borderRadius: 20, border: '1px solid #eaeaea', overflow: 'hidden', transition: '0.2s' }}>
-                    <div style={{ position: 'relative', paddingTop: '85%', background: '#f4f3f0' }}>
-                      {!imgErrors.has(p.id) && p.image_url ? <img src={p.image_url} alt={p.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} onError={() => setImgErrors(prev => new Set(prev).add(p.id))} /> : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, color: '#bbb' }}>📦</div>}
-                      {isOut && <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ background: '#fff', padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 700 }}>نفد المخزون</span></div>}
+                  <div key={p.id} className="sf-card">
+                    <div className="sf-card-img">
+                      {!imgErrors.has(p.id) && p.image_url
+                        ? <img src={p.image_url} alt={p.name} onError={() => setImgErrors(prev => new Set(prev).add(p.id))} />
+                        : <div className="sf-card-img-ph">📦</div>}
+                      {isOut && <div className="sf-out-badge"><span>نفد المخزون</span></div>}
+                      {disc > 0 && !isOut && <div className="sf-discount-badge">-{disc}%</div>}
                     </div>
-                    <div style={{ padding: '14px 16px 16px' }}>
-                      {p.category && <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>{p.category}</div>}
-                      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>{p.name}</div>
-                      {hasVariants && (
-                        <div style={{ marginBottom: 12 }}>
-                          {Object.entries(
-                            p.variants!.reduce((acc, v) => {
-                              Object.entries(v.attributes).forEach(([key, val]) => {
-                                if (!acc[key]) acc[key] = new Set();
-                                acc[key].add(val);
-                              });
-                              return acc;
-                            }, {} as Record<string, Set<string>>)
-                          ).map(([attrName, values]) => (
-                            <div key={attrName} style={{ marginBottom: 8 }}>
-                              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>{attrName}:</div>
-                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                {Array.from(values).map(val => {
-                                  const variantForValue = p.variants?.find(v => v.attributes[attrName] === val);
-                                  const isSelected = selectedVariants[p.id] === variantForValue?.id;
-                                  return (
-                                    <button
-                                      key={val}
-                                      onClick={() => variantForValue && setSelectedVariants(prev => ({ ...prev, [p.id]: variantForValue.id }))}
-                                      style={{ padding: '4px 12px', borderRadius: 30, border: isSelected ? '2px solid #2563eb' : '1px solid #ddd', background: isSelected ? '#eff6ff' : 'white', cursor: 'pointer', fontSize: 12 }}
-                                    >
-                                      {val}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                        <span style={{ fontSize: 18, fontWeight: 700 }}>{price.toLocaleString()} ر.س</span>
-                        {p.original_price && <span style={{ fontSize: 13, color: '#bbb', textDecoration: 'line-through' }}>{p.original_price.toLocaleString()}</span>}
+                    <div className="sf-card-body">
+                      {p.category && <span className="sf-cat-tag">{p.category}</span>}
+                      <div className="sf-card-name">{p.name}</div>
+                      {p.description && <div className="sf-card-desc">{p.description}</div>}
+                      {renderVariants(p)}
+                    </div>
+                    <div className="sf-card-footer">
+                      <div className="sf-price-wrap">
+                        <span className="sf-price">{price.toLocaleString()} <span style={{ fontSize: 13, fontWeight: 500 }}>ر.س</span></span>
+                        {p.original_price && <span className="sf-price-orig">{p.original_price.toLocaleString()} ر.س</span>}
                       </div>
-                      <button onClick={() => addToCart(p)} disabled={isOut} style={{ width: '100%', height: 40, borderRadius: 40, border: 'none', background: isOut ? '#eee' : '#1a1a1a', color: isOut ? '#999' : '#fff', cursor: 'pointer' }}>
-                        {isOut ? 'غير متوفر' : 'أضف للسلة'}
+                      <button className="sf-add-btn" disabled={isOut} onClick={() => addToCart(p)}>
+                        {isOut ? 'غير متوفر' : <><Plus size={15} /> أضف</>}
                       </button>
                     </div>
                   </div>
@@ -330,50 +739,34 @@ export default function Storefront() {
               })}
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="sf-list">
               {filtered.map(p => {
-                const { price, available } = getVariantPriceAndStock(p);
+                const { price, available } = getVariantInfo(p);
                 const isOut = available <= 0;
-                const hasVariants = p.variants && p.variants.length > 0;
+                const disc = discountPct(p);
                 return (
-                  <div key={p.id} style={{ background: '#fff', borderRadius: 16, border: '1px solid #eaeaea', display: 'flex', overflow: 'hidden' }}>
-                    <div style={{ width: 120, height: 120, background: '#f4f3f0', flexShrink: 0 }}>
-                      {!imgErrors.has(p.id) && p.image_url ? <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={() => setImgErrors(prev => new Set(prev).add(p.id))} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>📦</div>}
+                  <div key={p.id} className="sf-list-card">
+                    <div className="sf-list-img">
+                      {!imgErrors.has(p.id) && p.image_url
+                        ? <img src={p.image_url} alt={p.name} onError={() => setImgErrors(prev => new Set(prev).add(p.id))} />
+                        : <div className="sf-list-img-ph">📦</div>}
                     </div>
-                    <div style={{ padding: 14, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div>
-                        {p.category && <div style={{ fontSize: 11, color: '#888' }}>{p.category}</div>}
-                        <div style={{ fontSize: 15, fontWeight: 600 }}>{p.name}</div>
-                        {hasVariants && (
-                          <div style={{ marginTop: 8 }}>
-                            {Object.entries(
-                              p.variants!.reduce((acc, v) => {
-                                Object.entries(v.attributes).forEach(([key, val]) => {
-                                  if (!acc[key]) acc[key] = new Set();
-                                  acc[key].add(val);
-                                });
-                                return acc;
-                              }, {} as Record<string, Set<string>>)
-                            ).map(([attrName, values]) => (
-                              <div key={attrName} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginLeft: 16 }}>
-                                <span style={{ fontSize: 12, fontWeight: 600 }}>{attrName}:</span>
-                                <div style={{ display: 'flex', gap: 6 }}>
-                                  {Array.from(values).map(val => {
-                                    const variantForValue = p.variants?.find(v => v.attributes[attrName] === val);
-                                    const isSelected = selectedVariants[p.id] === variantForValue?.id;
-                                    return (
-                                      <button key={val} onClick={() => variantForValue && setSelectedVariants(prev => ({ ...prev, [p.id]: variantForValue.id }))} style={{ padding: '2px 8px', borderRadius: 20, border: isSelected ? '1px solid #2563eb' : '1px solid #ddd', background: isSelected ? '#eff6ff' : 'white', cursor: 'pointer', fontSize: 11 }}>{val}</button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                    <div className="sf-list-body">
+                      <div className="sf-list-info">
+                        {p.category && <span className="sf-cat-tag" style={{ marginBottom: 6, display: 'inline-block' }}>{p.category}</span>}
+                        <div className="sf-card-name" style={{ marginBottom: 4 }}>{p.name}</div>
+                        {p.description && <div className="sf-card-desc">{p.description}</div>}
+                        <div style={{ marginTop: 8 }}>{renderVariants(p)}</div>
                       </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 18, fontWeight: 700 }}>{price.toLocaleString()} ر.س</div>
-                        <button onClick={() => addToCart(p)} disabled={isOut} style={{ marginTop: 10, padding: '8px 16px', borderRadius: 30, border: 'none', background: isOut ? '#eee' : '#1a1a1a', color: isOut ? '#999' : '#fff', cursor: 'pointer' }}>{isOut ? 'غير متوفر' : 'أضف للسلة'}</button>
+                      <div className="sf-list-right">
+                        <div className="sf-price-wrap" style={{ alignItems: 'flex-end' }}>
+                          <span className="sf-price">{price.toLocaleString()} <span style={{ fontSize: 13, fontWeight: 500 }}>ر.س</span></span>
+                          {p.original_price && <span className="sf-price-orig">{p.original_price.toLocaleString()} ر.س</span>}
+                          {disc > 0 && <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', background: 'var(--md-secondary)', padding: '2px 8px', borderRadius: 100 }}>-{disc}%</span>}
+                        </div>
+                        <button className="sf-add-btn" disabled={isOut} onClick={() => addToCart(p)}>
+                          {isOut ? 'غير متوفر' : <><Plus size={15} /> أضف للسلة</>}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -384,52 +777,90 @@ export default function Storefront() {
         </div>
       </div>
 
-      {/* Cart Drawer */}
+      {/* CART DRAWER */}
       {showCart && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', justifyContent: 'flex-end' }} onClick={() => setShowCart(false)}>
-          <div style={{ width: '100%', maxWidth: 440, background: '#fff', height: '100vh', display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 24px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid #eaeaea', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700 }}>سلة المشتريات</h2>
-              <button onClick={() => setShowCart(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
+        <div className="sf-backdrop" onClick={() => setShowCart(false)}>
+          <div className="sf-drawer" onClick={e => e.stopPropagation()}>
+
+            <div className="sf-drawer-header">
+              <span className="sf-drawer-title">🛍️ سلة المشتريات {totalItems > 0 && `(${totalItems})`}</span>
+              <button className="sf-drawer-close" onClick={() => setShowCart(false)}><X size={20} /></button>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+
+            <div className="sf-drawer-body">
               {orderStatus === 'success' ? (
-                <div style={{ textAlign: 'center', padding: 40 }}><div style={{ fontSize: 48, marginBottom: 16 }}>✅</div><h3>تم إرسال طلبك!</h3><button onClick={resetOrder} style={{ marginTop: 20, padding: '12px 24px', background: '#1a1a1a', color: '#fff', border: 'none', borderRadius: 40, cursor: 'pointer' }}>متابعة التسوق</button></div>
+                <div className="sf-success">
+                  <div className="sf-success-icon">✅</div>
+                  <div className="sf-success-title">تم إرسال طلبك!</div>
+                  <div className="sf-success-sub">سيتواصل معك صاحب المتجر قريباً</div>
+                  <button className="sf-continue-btn" onClick={resetOrder}>متابعة التسوق</button>
+                </div>
               ) : cart.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 40 }}>السلة فارغة</div>
+                <div className="sf-empty" style={{ margin: 'auto' }}>
+                  <div className="sf-empty-icon">🛒</div>
+                  <div className="sf-empty-title">السلة فارغة</div>
+                  <div className="sf-empty-sub">أضف منتجات للبدء</div>
+                </div>
               ) : (
                 <>
                   {cart.map(item => (
-                    <div key={`${item.productId}-${item.variantId}`} style={{ display: 'flex', gap: 14, padding: '14px 0', borderBottom: '1px solid #f0f0ec' }}>
-                      <div style={{ width: 72, height: 72, borderRadius: 12, background: '#f4f3f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📦</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600 }}>{item.productName}{item.attributes && ` (${Object.values(item.attributes).join(', ')})`}</div>
-                        <div>{item.price.toLocaleString()} ر.س</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-                          <button onClick={() => updateQty(item.productId, item.variantId, -1)} style={{ width: 28, height: 28, border: '1px solid #eaeaea', background: '#f8f8f6', borderRadius: 8, cursor: 'pointer' }}><Minus size={14} /></button>
-                          <span>{item.quantity}</span>
-                          <button onClick={() => updateQty(item.productId, item.variantId, 1)} style={{ width: 28, height: 28, border: '1px solid #eaeaea', background: '#f8f8f6', borderRadius: 8, cursor: 'pointer' }}><Plus size={14} /></button>
-                          <button onClick={() => removeFromCart(item.productId, item.variantId)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12 }}>حذف</button>
+                    <div key={`${item.productId}-${item.variantId}`} className="sf-cart-item">
+                      <div className="sf-cart-thumb">
+                        {products.find(p => p.id === item.productId)?.image_url
+                          ? <img src={products.find(p => p.id === item.productId)!.image_url} alt="" />
+                          : '📦'}
+                      </div>
+                      <div className="sf-cart-info">
+                        <div className="sf-cart-name">{item.productName}</div>
+                        {item.attributes && <div className="sf-cart-attrs">{Object.values(item.attributes).join(' · ')}</div>}
+                        <div className="sf-cart-price">{item.price.toLocaleString()} ر.س</div>
+                        <div className="sf-qty-row">
+                          <button className="sf-qty-btn" onClick={() => updateQty(item.productId, item.variantId, -1)}><Minus size={13} /></button>
+                          <span className="sf-qty-num">{item.quantity}</span>
+                          <button className="sf-qty-btn" onClick={() => updateQty(item.productId, item.variantId, 1)}><Plus size={13} /></button>
+                          <button className="sf-remove-btn" onClick={() => removeFromCart(item.productId, item.variantId)}>✕ حذف</button>
                         </div>
                       </div>
                     </div>
                   ))}
-                  <div style={{ marginTop: 20 }}>
-                    <input placeholder="الاسم الكامل *" value={customer.name} onChange={e => setCustomer({ ...customer, name: e.target.value })} style={{ width: '100%', padding: 12, border: '1px solid #eaeaea', borderRadius: 10, marginBottom: 12 }} />
-                    <input placeholder="رقم الجوال *" value={customer.phone} onChange={e => setCustomer({ ...customer, phone: e.target.value })} style={{ width: '100%', padding: 12, border: '1px solid #eaeaea', borderRadius: 10, marginBottom: 12 }} />
-                    <input placeholder="العنوان" value={customer.address} onChange={e => setCustomer({ ...customer, address: e.target.value })} style={{ width: '100%', padding: 12, border: '1px solid #eaeaea', borderRadius: 10, marginBottom: 12 }} />
-                    <textarea placeholder="ملاحظات" value={customer.notes} onChange={e => setCustomer({ ...customer, notes: e.target.value })} rows={2} style={{ width: '100%', padding: 12, border: '1px solid #eaeaea', borderRadius: 10, marginBottom: 12, fontFamily: 'inherit' }} />
-                    <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-                      {['cash', 'card', 'transfer'].map(m => (<button key={m} onClick={() => setPaymentMethod(m)} style={{ flex: 1, padding: 10, border: '1.5px solid #eaeaea', borderRadius: 10, background: paymentMethod === m ? '#1a1a1a' : '#fff', color: paymentMethod === m ? '#fff' : '#444', cursor: 'pointer' }}>{m === 'cash' ? 'كاش' : m === 'card' ? 'بطاقة' : 'تحويل'}</button>))}
+
+                  <div className="sf-form" style={{ marginTop: 20 }}>
+                    <input className="sf-input" placeholder="الاسم الكامل *" value={customer.name} onChange={e => setCustomer({ ...customer, name: e.target.value })} />
+                    <input className="sf-input" placeholder="رقم الجوال *" value={customer.phone} onChange={e => setCustomer({ ...customer, phone: e.target.value })} />
+                    <input className="sf-input" placeholder="العنوان" value={customer.address} onChange={e => setCustomer({ ...customer, address: e.target.value })} />
+                    <textarea className="sf-input" placeholder="ملاحظات إضافية..." value={customer.notes} onChange={e => setCustomer({ ...customer, notes: e.target.value })} rows={2} />
+
+                    <div>
+                      <div className="sf-payment-label">طريقة الدفع</div>
+                      <div className="sf-payment-opts">
+                        {[
+                          { k: 'cash', label: 'كاش', icon: '💵' },
+                          { k: 'card', label: 'بطاقة', icon: '💳' },
+                          { k: 'transfer', label: 'تحويل', icon: '🏦' },
+                        ].map(m => (
+                          <button key={m.k} className={`sf-pay-btn${paymentMethod === m.k ? ' active' : ''}`}
+                            onClick={() => setPaymentMethod(m.k)}>
+                            <span className="sf-pay-icon">{m.icon}</span>
+                            {m.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </>
               )}
             </div>
+
             {orderStatus !== 'success' && cart.length > 0 && (
-              <div style={{ padding: '20px 24px', borderTop: '1px solid #eaeaea', background: '#fafafa' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}><span>الإجمالي</span><span style={{ fontSize: 22, fontWeight: 800 }}>{totalPrice.toLocaleString()} ر.س</span></div>
-                <button onClick={submitOrder} disabled={orderStatus === 'submitting'} style={{ width: '100%', padding: 14, background: '#25d366', color: '#fff', border: 'none', borderRadius: 40, fontSize: 16, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}><span>📱</span>{orderStatus === 'submitting' ? 'جاري...' : 'تأكيد الطلب عبر واتساب'}</button>
+              <div className="sf-drawer-footer">
+                <div className="sf-total-row">
+                  <span className="sf-total-label">الإجمالي</span>
+                  <span className="sf-total-price">{totalPrice.toLocaleString()} <span style={{ fontSize: 16, fontWeight: 600 }}>ر.س</span></span>
+                </div>
+                <button className="sf-checkout-btn" disabled={orderStatus === 'submitting'} onClick={submitOrder}>
+                  <span>📱</span>
+                  {orderStatus === 'submitting' ? 'جاري الإرسال...' : 'تأكيد الطلب عبر واتساب'}
+                </button>
               </div>
             )}
           </div>
