@@ -17,60 +17,40 @@ export default function Dashboard({ stats, notifications, orders, products }: Pr
 
   const fetchReport = async () => {
     setLoadingReport(true);
-    try {
-      const data = await api.getReport();
-      setReport(data.report);
-    } catch {
-      setReport('حدث خطأ أثناء جلب التقرير.');
-    }
+    const data = await api.getReport();
+    setReport(data.report);
     setLoadingReport(false);
   };
 
   const recentOrders = orders.slice(0, 5);
   const lowStock = products.filter((p) => p.quantity <= p.minQuantity);
 
-  const sourceLabel = (s: string) => {
-    if (s === 'واتساب') return { label: t('orders.whatsapp'), cls: 'whatsapp' };
-    if (s === 'انستغرام') return { label: t('orders.instagram'), cls: 'instagram' };
-    return { label: t('orders.direct'), cls: 'direct' };
-  };
-
-  const statusInfo = (s: string) => {
-    if (s === 'جديد')        return { label: t('orders.new'),       cls: 'new' };
-    if (s === 'قيد التنفيذ') return { label: t('orders.pending'),   cls: 'pending' };
-    if (s === 'مكتمل')       return { label: t('orders.completed'), cls: 'done' };
-    return { label: t('orders.cancelled'), cls: 'cancelled' };
-  };
-
   return (
     <div className="page">
-      <div className="page-title">📊 {t('dashboard.title')}</div>
+      <div className="page-title">{t('dashboard.title')}</div>
 
-      {/* Stats */}
       <div className="stats-grid">
         <div className="stat-card blue">
           <div className="stat-num">{stats?.totalProducts ?? 0}</div>
-          <div className="stat-label">📦 {t('dashboard.totalProducts')}</div>
+          <div className="stat-label">{t('dashboard.totalProducts')}</div>
         </div>
         <div className="stat-card green">
           <div className="stat-num">{stats?.todayOrders ?? 0}</div>
-          <div className="stat-label">🛒 {t('dashboard.todayOrders')}</div>
+          <div className="stat-label">{t('dashboard.todayOrders')}</div>
         </div>
         <div className="stat-card amber">
           <div className="stat-num">{stats?.todayRevenue ?? 0} {t('common.currency')}</div>
-          <div className="stat-label">💰 {t('dashboard.todayRevenue')}</div>
+          <div className="stat-label">{t('dashboard.todayRevenue')}</div>
         </div>
         <div className="stat-card red">
           <div className="stat-num">{stats?.lowStockProducts?.length ?? 0}</div>
-          <div className="stat-label">⚠️ {t('dashboard.lowStock')}</div>
+          <div className="stat-label">{t('dashboard.lowStock')}</div>
         </div>
       </div>
 
-      {/* Two columns */}
       <div className="two-col">
-        {/* Recent orders */}
         <div className="card">
-          <div className="card-title">🛒 {t('dashboard.recentOrders')}</div>
+          <div className="card-title">{t('dashboard.recentOrders')}</div>
           {recentOrders.length === 0 ? (
             <div className="empty">{t('orders.noOrders')}</div>
           ) : (
@@ -84,48 +64,49 @@ export default function Dashboard({ stats, notifications, orders, products }: Pr
                 </tr>
               </thead>
               <tbody>
-                {recentOrders.map((o) => {
-                  const src = sourceLabel(o.source);
-                  const sts = statusInfo(o.status);
-                  return (
-                    <tr key={o.id}>
-                      <td style={{ fontWeight: 600 }}>{o.customerName}</td>
-                      <td><span className={`source-badge ${src.cls}`}>{src.label}</span></td>
-                      <td style={{ fontWeight: 700, color: '#1877f2' }}>{o.totalPrice} {t('common.currency')}</td>
-                      <td><span className={`status-badge ${sts.cls}`}>{sts.label}</span></td>
-                    </tr>
-                  );
-                })}
+                {recentOrders.map((o) => (
+                  <tr key={o.id}>
+                    <td>{o.customerName}</td>
+                    <td>
+                      <span className={`source-badge ${o.source === 'واتساب' ? 'whatsapp' : o.source === 'انستغرام' ? 'instagram' : 'direct'}`}>
+                        {o.source === 'واتساب' ? t('orders.whatsapp') : o.source === 'انستغرام' ? t('orders.instagram') : t('orders.direct')}
+                      </span>
+                    </td>
+                    <td>{o.totalPrice} {t('common.currency')}</td>
+                    <td>
+                      <span className={`status-badge ${o.status === 'مكتمل' ? 'done' : o.status === 'جديد' ? 'new' : o.status === 'ملغي' ? 'cancelled' : 'pending'}`}>
+                        {o.status === 'جديد' ? t('orders.new') : o.status === 'قيد التنفيذ' ? t('orders.pending') : o.status === 'مكتمل' ? t('orders.completed') : t('orders.cancelled')}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
         </div>
 
-        {/* Stock alerts + AI */}
         <div className="card">
           <div className="card-title">⚠️ {t('dashboard.stockAlerts')}</div>
           {lowStock.length === 0 ? (
             <div className="empty success-msg">✅ {t('dashboard.stockOk')}</div>
           ) : (
-            <div style={{ marginBottom: 16 }}>
-              {lowStock.map((p) => (
-                <div key={p.id} className="low-stock-item">
-                  <div className="low-stock-name">{p.name}</div>
-                  <div className={`low-stock-qty ${p.quantity === 0 ? 'zero' : 'low'}`}>
-                    {p.quantity === 0 ? t('products.outOfStock') : `${p.quantity} ${t('products.pieces')}`}
-                  </div>
+            lowStock.map((p) => (
+              <div key={p.id} className="low-stock-item">
+                <div className="low-stock-name">{p.name}</div>
+                <div className={`low-stock-qty ${p.quantity === 0 ? 'zero' : 'low'}`}>
+                  {p.quantity === 0 ? t('products.outOfStock') : `${p.quantity} ${t('products.pieces')}`}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))
           )}
 
           <div className="ai-section">
             <button className="ai-btn" onClick={fetchReport} disabled={loadingReport}>
-              {loadingReport ? `⏳ ${t('common.loading')}` : `🤖 ${t('dashboard.aiReport')}`}
+              {loadingReport ? t('common.loading') : `🤖 ${t('dashboard.aiReport')}`}
             </button>
             {report && (
               <div className="ai-report">
-                {report.split('\n').map((line, i) => <div key={i}>{line}</div>)}
+                {report.split('\n').map((line, i) => (<div key={i}>{line}</div>))}
               </div>
             )}
           </div>
